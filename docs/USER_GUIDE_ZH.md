@@ -37,7 +37,7 @@ Ultimate 版在原项目基础上增加：
 
 Ultimate Debug 版使用独立 application id：
 
-`com.jev.probe.ultimate`
+`io.github.kitzhn.jevultimate.debug`
 
 因此可以和原版 Jev 同时安装，互不覆盖。
 
@@ -575,9 +575,41 @@ GitHub Actions 会自动构建 Debug APK。
 
 Ultimate Debug 版本名：
 
-`2.0.0-ultimate`
+`2.0.0-debug`
 
-## 25. 数据模型概览
+
+## 25. 固定签名与长期更新
+
+如果只是自己试用，Actions 里的 Debug APK 已经可以直接安装。
+
+如果要长期发给朋友并且以后希望“直接覆盖升级、不丢本地数据”，建议使用固定 Release 签名。
+
+仓库已经提供手动工作流：
+
+**Actions → Build Signed Ultimate Release**
+
+稳定版 application id：
+
+`io.github.kitzhn.jevultimate`
+
+需要在 GitHub 仓库 Settings → Secrets and variables → Actions 中添加 4 个 Secrets：
+
+- `JEV_KEYSTORE_B64`：keystore 文件的 Base64 内容
+- `JEV_STORE_PASSWORD`
+- `JEV_KEY_ALIAS`
+- `JEV_KEY_PASSWORD`
+
+这些 Secrets 不会写入仓库。
+
+配置后手动运行 Release workflow，会生成：
+
+`jev-ultimate-release`
+
+请长期保存原始 keystore。以后所有正式版本必须使用同一签名，否则 Android 无法覆盖安装旧版本。
+
+Debug 包和 Release 包使用不同 application id，因此可以同时安装；Debug 用于测试，Release 用于长期分发。
+
+## 26. 数据模型概览
 
 ```
 Chat App
