@@ -81,41 +81,55 @@ adb shell "run-as $PKG cp /data/local/tmp/contact_relations.json files/kb/contac
 adb shell "run-as $PKG cp /data/local/tmp/demo-a-relations.json files/kb/relations/demo-a.json"
 adb shell "run-as $PKG cp /data/local/tmp/demo-a-log.json files/kb/logs/demo-a.json"
 
-adb shell am force-stop "$PKG"
-adb shell monkey -p "$PKG" -c android.intent.category.LAUNCHER 1 >/dev/null
-sleep 2
-adb exec-out screencap -p > screenshots/01-home.png
-
-cat > /tmp/tap_text.py <<'PY'
+cat > /tmp/ui_text.py <<'PY'
 import subprocess, xml.etree.ElementTree as ET, re, sys, time
-target = sys.argv[1]
-for attempt in range(8):
+
+mode, target = sys.argv[1], sys.argv[2]
+
+def dump():
     subprocess.run(["adb","shell","uiautomator","dump","/sdcard/window.xml"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
     subprocess.run(["adb","pull","/sdcard/window.xml","/tmp/window.xml"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    root = ET.parse("/tmp/window.xml").getroot()
+    return ET.parse("/tmp/window.xml").getroot()
+
+for attempt in range(10):
+    root = dump()
+    matches = []
     for n in root.iter("node"):
         text = n.attrib.get("text","")
         desc = n.attrib.get("content-desc","")
-        if target in text or target in desc:
+        ok = (text == target or desc == target) if mode == "exact" else (target in text or target in desc)
+        if ok:
             m = re.match(r"\[(\d+),(\d+)\]\[(\d+),(\d+)\]", n.attrib.get("bounds",""))
             if m:
-                x1,y1,x2,y2 = map(int,m.groups())
-                subprocess.run(["adb","shell","input","tap",str((x1+x2)//2),str((y1+y2)//2)], check=True)
-                time.sleep(1.3)
-                sys.exit(0)
-    subprocess.run(["adb","shell","input","swipe","540","1800","540","650","350"])
-    time.sleep(.7)
-raise SystemExit("text not found: "+target)
+                matches.append(tuple(map(int,m.groups())))
+    if matches:
+        if mode == "wait":
+            sys.exit(0)
+        x1,y1,x2,y2 = matches[-1]
+        subprocess.run(["adb","shell","input","tap",str((x1+x2)//2),str((y1+y2)//2)], check=True)
+        time.sleep(1.0)
+        sys.exit(0)
+    if mode == "wait":
+        time.sleep(.5)
+    else:
+        subprocess.run(["adb","shell","input","swipe","540","1800","540","650","350"])
+        time.sleep(.6)
+raise SystemExit(f"{mode} text not found: {target}")
 PY
 
-python3 /tmp/tap_text.py "API 与设置"
+adb shell am force-stop "$PKG"
+adb shell monkey -p "$PKG" -c android.intent.category.LAUNCHER 1 >/dev/null
+python3 /tmp/ui_text.py wait "Jev Ultimate"
+adb exec-out screencap -p > screenshots/01-home.png
+
+adb shell am start -n "$PKG/com.jev.probe.SettingsActivity" >/dev/null
+python3 /tmp/ui_text.py wait "设置"
 adb exec-out screencap -p > screenshots/02-settings.png
 
-adb shell input keyevent KEYCODE_BACK
-sleep 1
-python3 /tmp/tap_text.py "联系人 · 画像 · 关系网"
-python3 /tmp/tap_text.py "联系人"
+adb shell am start -n "$PKG/com.jev.probe.KnowledgeActivity" >/dev/null
+python3 /tmp/ui_text.py wait "知识库与联系人"
+python3 /tmp/ui_text.py exact "联系人"
 adb exec-out screencap -p > screenshots/03-contacts.png
 
-python3 /tmp/tap_text.py "关系网"
+python3 /tmp/ui_text.py exact "关系网"
 adb exec-out screencap -p > screenshots/04-relationship-graph.png
