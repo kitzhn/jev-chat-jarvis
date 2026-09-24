@@ -7,7 +7,12 @@ import org.json.JSONObject
 import java.io.File
 
 /** Note / contact / history counts, for the settings screen. */
-data class KbCounts(val notes: Int, val contacts: Int, val logLines: Int)
+data class KbCounts(
+    val notes: Int,
+    val contacts: Int,
+    val logLines: Int,
+    val relationEdges: Int = 0
+)
 
 /**
  * The knowledge-base store: three kinds of JSON file under `filesDir/kb`.
@@ -29,12 +34,14 @@ class KbStore private constructor(context: Context) {
     private val root: File get() = File(app.filesDir, "kb")
     private val notesFile: File get() = File(root, "notes.json")
     private val contactsFile: File get() = File(root, "contacts.json")
+    private val graphFile: File get() = File(root, "contact_relations.json")
     private fun logFile(contactId: String) = File(File(root, "logs"), "$contactId.json")
     private fun screenFile(contactId: String) = File(File(root, "logs"), "$contactId.screen.json")
     private fun relationFile(contactId: String) = File(File(root, "relations"), "$contactId.json")
 
     private var notesCache: MutableList<Note>? = null
     private var contactsCache: MutableList<Contact>? = null
+    private var graphCache: MutableList<ContactRelation>? = null
     private val logCache = HashMap<String, MutableList<LogEntry>>()
     private val relationCache = HashMap<String, MutableList<RelationshipEvent>>()
 
@@ -71,6 +78,60 @@ class KbStore private constructor(context: Context) {
     fun contacts(): List<Contact> = synchronized(lock) { loadContacts().toList() }
 
     fun contact(id: String): Contact? = synchronized(lock) { loadContacts().firstOrNull { it.id == id } }
+
+    fun contactRelations(): List<ContactRelation> = synchronized(lock) { loadContactRelations().toList() }
+
+    fun relationsFor(contactId: String): List<ContactRelation> = synchronized(lock) {
+        loadContactRelations().filter { it.fromId == contactId || it.toId == contactId }
+    }
+
+    fun saveContactRelation(relation: ContactRelation): Boolean = synchronized(lock) {
+        if (relation.fromId.isBlank() || relation.toId.isBlank() || relation.fromId == relation.toId) {
+            return@synchronized false
+        }
+        if (loadContacts().none { it.id == relation.fromId } ||
+            loadContacts().none { it.id == relation.toId }) {
+            return@synchronized false
+        }
+        val list = loadContactRelations()
+        val i = list.indexOfFirst { it.id == relation.id }
+        val stamped = relation.copy(
+            type = relation.type.trim(),
+            strength = relation.strength.coerceIn(0, 100),
+            note = relation.note.trim(),
+            updatedAt = System.currentTimeMillis()
+        )
+        if (i >= 0) list[i] = stamped else list.add(stamped)
+        val ok = writeAtomic(graphFile, contactRelationsJson(list))
+        if (!ok) graphCache = null
+        ok
+    }
+
+    fun deleteContactRelation(id: String): Boolean = synchronized(lock) {
+        val list = loadContactRelations()
+        if (!list.removeAll { it.id == id }) return@synchronized true
+        val ok = writeAtomic(graphFile, contactRelationsJson(list))
+        if (!ok) graphCache = null
+        ok
+    }
+
+    fun relationContext(contactId: String, limit: Int = 8): List<String> = synchronized(lock) {
+        val names = loadContacts().associateBy({ it.id }, { it.name })
+        loadContactRelations()
+            .filter { it.fromId == contactId || it.toId == contactId }
+            .sortedByDescending { it.updatedAt }
+            .take(limit.coerceIn(0, 20))
+            .mapNotNull { edge ->
+                val otherId = if (edge.fromId == contactId) edge.toId else edge.fromId
+                val otherName = names[otherId]?.ifBlank { null } ?: return@mapNotNull null
+                buildString {
+                    append(otherName)
+                    if (edge.type.isNotBlank()) append("：").append(edge.type)
+                    append("（强度 ").append(edge.strength.coerceIn(0, 100)).append("/100）")
+                    if (edge.note.isNotBlank()) append("；").append(edge.note)
+                }
+            }
+    }
 
     fun saveContact(c: Contact): Boolean = synchronized(lock) {
         val list = loadContacts()
@@ -221,6 +282,25 @@ class KbStore private constructor(context: Context) {
         if (!writeAtomic(relationFile(targetId), relationshipEventsJson(mergedEvents))) return false
         relationCache[targetId] = mergedEvents
 
+        val rewired = loadContactRelations()
+            .map { edge ->
+                edge.copy(
+                    fromId = if (edge.fromId == sourceId) targetId else edge.fromId,
+                    toId = if (edge.toId == sourceId) targetId else edge.toId
+                )
+            }
+            .filter { it.fromId != it.toId }
+            .distinctBy { edge ->
+                val pair = listOf(edge.fromId, edge.toId).sorted().joinToString("|")
+                pair + "\u0000" + edge.type.trim().lowercase()
+            }
+            .toMutableList()
+        if (!writeAtomic(graphFile, contactRelationsJson(rewired))) {
+            graphCache = null
+            return false
+        }
+        graphCache = rewired
+
         list.removeAll { it.id == sourceId }
         if (!writeAtomic(contactsFile, contactsJson(list))) {
             contactsCache = null
@@ -249,6 +329,12 @@ class KbStore private constructor(context: Context) {
         runCatching { logFile(id).delete() }
         runCatching { screenFile(id).delete() }
         runCatching { relationFile(id).delete() }
+        val edges = loadContactRelations()
+        if (edges.removeAll { it.fromId == id || it.toId == id }) {
+            val graphOk = writeAtomic(graphFile, contactRelationsJson(edges))
+            if (!graphOk) graphCache = null
+            ok = ok && graphOk
+        }
         ok
     }
 
@@ -455,7 +541,7 @@ class KbStore private constructor(context: Context) {
         val contacts = loadContacts()
         var lines = 0
         contacts.forEach { lines += loadLog(it.id).size }
-        KbCounts(loadNotes().size, contacts.size, lines)
+        KbCounts(loadNotes().size, contacts.size, lines, loadContactRelations().size)
     }
 
     /**
@@ -465,6 +551,7 @@ class KbStore private constructor(context: Context) {
     fun clearAll() = synchronized(lock) {
         notesCache = null
         contactsCache = null
+        graphCache = null
         logCache.clear()
         relationCache.clear()
         lastScreenCache.clear()
@@ -526,6 +613,31 @@ class KbStore private constructor(context: Context) {
             }
         }
         if (loaded.trustworthy) contactsCache = list
+        return list
+    }
+
+    private fun loadContactRelations(): MutableList<ContactRelation> {
+        graphCache?.let { return it }
+        val list = ArrayList<ContactRelation>()
+        val loaded = readJsonArray(graphFile)
+        loaded.arr?.let { arr ->
+            for (i in 0 until arr.length()) {
+                val o = arr.optJSONObject(i) ?: continue
+                val fromId = o.optString("fromId").trim()
+                val toId = o.optString("toId").trim()
+                if (fromId.isBlank() || toId.isBlank() || fromId == toId) continue
+                list.add(ContactRelation(
+                    id = o.optString("id").ifBlank { newId() },
+                    fromId = fromId,
+                    toId = toId,
+                    type = o.optString("type"),
+                    strength = o.optInt("strength", 50).coerceIn(0, 100),
+                    note = o.optString("note"),
+                    updatedAt = o.optLong("updatedAt", 0L)
+                ))
+            }
+        }
+        if (loaded.trustworthy) graphCache = list
         return list
     }
 
@@ -613,6 +725,21 @@ class KbStore private constructor(context: Context) {
                 .put("notes", c.notes)
                 .put("autoSummary", c.autoSummary)
                 .put("updatedAt", c.updatedAt))
+        }
+        return arr.toString()
+    }
+
+    private fun contactRelationsJson(list: List<ContactRelation>): String {
+        val arr = JSONArray()
+        list.forEach { edge ->
+            arr.put(JSONObject()
+                .put("id", edge.id)
+                .put("fromId", edge.fromId)
+                .put("toId", edge.toId)
+                .put("type", edge.type)
+                .put("strength", edge.strength.coerceIn(0, 100))
+                .put("note", edge.note)
+                .put("updatedAt", edge.updatedAt))
         }
         return arr.toString()
     }
