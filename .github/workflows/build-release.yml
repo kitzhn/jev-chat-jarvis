@@ -1,0 +1,70 @@
+name: Build Signed Ultimate Release
+
+on:
+  workflow_dispatch:
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: gradle
+
+      - name: Install Android SDK 35
+        shell: bash
+        run: |
+          SDKMANAGER="${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager"
+          yes | "$SDKMANAGER" --licenses >/dev/null || true
+          "$SDKMANAGER" "platform-tools" "platforms;android-35" "build-tools;35.0.0"
+
+      - name: Validate signing secrets
+        shell: bash
+        env:
+          JEV_KEYSTORE_B64: ${{ secrets.JEV_KEYSTORE_B64 }}
+          JEV_STORE_PASSWORD: ${{ secrets.JEV_STORE_PASSWORD }}
+          JEV_KEY_ALIAS: ${{ secrets.JEV_KEY_ALIAS }}
+          JEV_KEY_PASSWORD: ${{ secrets.JEV_KEY_PASSWORD }}
+        run: |
+          test -n "$JEV_KEYSTORE_B64" || (echo "Missing JEV_KEYSTORE_B64" && exit 1)
+          test -n "$JEV_STORE_PASSWORD" || (echo "Missing JEV_STORE_PASSWORD" && exit 1)
+          test -n "$JEV_KEY_ALIAS" || (echo "Missing JEV_KEY_ALIAS" && exit 1)
+          test -n "$JEV_KEY_PASSWORD" || (echo "Missing JEV_KEY_PASSWORD" && exit 1)
+
+      - name: Prepare release keystore
+        shell: bash
+        env:
+          JEV_KEYSTORE_B64: ${{ secrets.JEV_KEYSTORE_B64 }}
+          JEV_STORE_PASSWORD: ${{ secrets.JEV_STORE_PASSWORD }}
+          JEV_KEY_ALIAS: ${{ secrets.JEV_KEY_ALIAS }}
+          JEV_KEY_PASSWORD: ${{ secrets.JEV_KEY_PASSWORD }}
+        run: |
+          echo "$JEV_KEYSTORE_B64" | base64 --decode > "$RUNNER_TEMP/jev-ultimate.keystore"
+          cat > "$RUNNER_TEMP/jev-release.properties" <<EOF
+          storeFile=$RUNNER_TEMP/jev-ultimate.keystore
+          storePassword=$JEV_STORE_PASSWORD
+          keyAlias=$JEV_KEY_ALIAS
+          keyPassword=$JEV_KEY_PASSWORD
+          EOF
+
+      - name: Make Gradle executable
+        run: chmod +x ./gradlew
+
+      - name: Build signed release APK
+        env:
+          JEV_KEYSTORE_PROPS: ${{ runner.temp }}/jev-release.properties
+        run: ./gradlew assembleRelease --stacktrace
+
+      - name: Upload signed release APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: jev-ultimate-release
+          path: app/build/outputs/apk/release/app-release.apk
+          if-no-files-found: error
