@@ -1,0 +1,10 @@
+{
+  "format": "jev-ultimate-api-config-v1",
+  "judgeProvider": "openrouter",
+  "judgeBaseUrl": "https://openrouter.ai/api",
+  "judgeModel": "typesafe/jev-1.13",
+  "replyBaseUrl": "https://openrouter.ai/api/v1",
+  "replyModel": "deepseek/deepseek-chat-v3.1",
+  "visionBaseUrl": "https://openrouter.ai/api/v1",
+  "visionModel": "qwen/qwen2.5-vl-72b-instruct"
+}

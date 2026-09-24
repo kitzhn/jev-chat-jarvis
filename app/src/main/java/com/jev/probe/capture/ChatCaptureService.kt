@@ -1,6 +1,7 @@
 package com.jev.probe.capture
 
 import android.accessibilityservice.AccessibilityService
+import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.Rect
 import android.os.Bundle
@@ -9,6 +10,7 @@ import android.os.Looper
 import android.util.Log
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
+import com.jev.probe.KnowledgeActivity
 import com.jev.probe.capture.ocr.MlKitOcr
 import com.jev.probe.capture.ocr.OcrLine
 import com.jev.probe.capture.ocr.ScreenCapture
@@ -113,6 +115,22 @@ open class ChatCaptureService : AccessibilityService() {
                         KbStore.get(this).saveOrMergeContact(title, pkg)
                     } catch (e: Exception) { "保存失败：${e.javaClass.simpleName}" }
                     main.post { overlay?.toast(msg) }
+                }
+            }
+        }
+        overlay?.onLinkContact = {
+            val title = currentSnapshot?.title
+            val pkg = activePkg ?: foregroundPkg ?: ""
+            when {
+                title.isNullOrBlank() -> overlay?.toast("当前会话没有标题，无法关联")
+                isTransientTitle(title) -> overlay?.toast("当前会话标题还没加载出来，稍后再试")
+                else -> runCatching {
+                    startActivity(Intent(this, KnowledgeActivity::class.java)
+                        .putExtra(KnowledgeActivity.EXTRA_LINK_APP, pkg)
+                        .putExtra(KnowledgeActivity.EXTRA_LINK_TITLE, title)
+                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                }.onFailure {
+                    overlay?.toast("打开联系人列表失败：${it.javaClass.simpleName}")
                 }
             }
         }

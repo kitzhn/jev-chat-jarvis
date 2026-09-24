@@ -28,8 +28,8 @@ class MainActivity : AppCompatActivity() {
 
     private lateinit var prefs: Prefs
     private lateinit var container: LinearLayout
-    private val a11yComponent =
-        "com.jev.probe/com.google.android.accessibility.selecttospeak.SelectToSpeakService"
+    private val a11yComponent: String
+        get() = "$packageName/com.google.android.accessibility.selecttospeak.SelectToSpeakService"
 
     private val accent = Color.parseColor("#3A7AFE")
     private val green = Color.parseColor("#16A34A")
@@ -63,7 +63,7 @@ class MainActivity : AppCompatActivity() {
     private fun build() {
         container.removeAllViews()
 
-        container.addView(text("Jev 聊天助手", 24f, ink, bold = true))
+        container.addView(text("Jev Ultimate", 24f, ink, bold = true))
         container.addView(text("在聊天 App 旁读对方消息（已支持 QQ、X、飞书），给出判断和候选回复。发送始终由你手动点。",
             13f, sub).apply { setPadding(0, dp(6), 0, dp(16)) })
 
@@ -92,8 +92,14 @@ class MainActivity : AppCompatActivity() {
 
         // Actions
         container.addView(sectionLabel("其他"))
-        container.addView(actionRow("设置", "密钥 · 模型 · 关系 · 透明度 · 会话白名单") {
+        container.addView(actionRow("API 与设置", "快速方案 · 自定义接口 · 密钥 · 模型 · 隐私设置") {
             startActivity(Intent(this, SettingsActivity::class.java))
+        })
+        container.addView(actionRow("联系人 · 画像 · 关系网", "跨 App 身份 · 好感时间线 · 联系人之间的关系") {
+            startActivity(Intent(this, KnowledgeActivity::class.java))
+        })
+        container.addView(actionRow("使用说明书", "首次安装、API 接入、联系人关联和常见问题") {
+            openUrl(GUIDE_URL)
         })
 
         // Master toggle
@@ -245,5 +251,7 @@ class MainActivity : AppCompatActivity() {
 
     companion object {
         private const val PRIVACY_URL = "https://chatjevs.com/privacy.html"
+        private const val GUIDE_URL =
+            "https://github.com/kitzhn/jev-chat-jarvis/blob/main/docs/USER_GUIDE_ZH.md"
     }
 }
