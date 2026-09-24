@@ -11,6 +11,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.EditText
 import android.widget.LinearLayout
+import android.widget.ProgressBar
 import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
@@ -20,6 +21,11 @@ import com.jev.probe.core.kb.AffectionScale
 import com.jev.probe.core.kb.Contact
 import com.jev.probe.core.kb.KbStore
 import com.jev.probe.core.kb.Note
+import com.jev.probe.core.kb.PlatformIdentity
+import com.jev.probe.core.kb.RelationshipEvent
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 import kotlin.math.roundToInt
 
 /**
@@ -37,6 +43,8 @@ class KnowledgeActivity : AppCompatActivity() {
 
     /** 0 = notes, 1 = contacts. */
     private var tab = 0
+    private var pendingLinkApp: String = ""
+    private var pendingLinkTitle: String = ""
 
     private val accent = Color.parseColor("#3A7AFE")
     private val ink = Color.parseColor("#111827")
@@ -50,6 +58,9 @@ class KnowledgeActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         store = KbStore.get(this)
+        pendingLinkApp = intent.getStringExtra(EXTRA_LINK_APP).orEmpty()
+        pendingLinkTitle = intent.getStringExtra(EXTRA_LINK_TITLE).orEmpty()
+        if (pendingLinkTitle.isNotBlank()) tab = 1
         window.decorView.setBackgroundColor(Color.parseColor("#F2F3F5"))
 
         val scroll = ScrollView(this)
@@ -68,7 +79,7 @@ class KnowledgeActivity : AppCompatActivity() {
     private fun render() {
         container.removeAllViews()
         container.addView(text("知识库与联系人", 24f, ink, bold = true))
-        container.addView(text("只存在本机，不上传。分析时按会话标题匹配联系人、按关键词命中笔记。",
+        container.addView(text("只存在本机，不上传。联系人可绑定多个 App 身份；分析时优先按“平台 + 会话标题”精确匹配。",
             12f, sub).apply { setPadding(0, dp(6), 0, dp(4)) })
         container.addView(tabs())
         if (tab == 0) renderNotes() else renderContacts()
@@ -222,16 +233,27 @@ class KnowledgeActivity : AppCompatActivity() {
     private fun renderContacts() {
         val contacts = store.contacts().sortedByDescending { it.updatedAt }
         container.addView(twoButtons("新建联系人", { editContactDialog(null) }, null, null))
+        if (pendingLinkTitle.isNotBlank()) container.addView(linkBanner())
         container.addView(affectionLegend())
         if (contacts.isEmpty()) {
             container.addView(emptyCard(
-                "还没有联系人。可以新建联系人，或在聊天里长按悬浮球保存当前会话。"))
+                "还没有联系人。可以先新建联系人；不同 App 的会话随后都能关联到同一个人。"))
             return
         }
         contacts.forEach { container.addView(contactRow(it)) }
         container.addView(text(
-            "好感度由用户手动维护，不会根据聊天内容自动升降。点卡片编辑完整画像，±5 可快速调整；长按删除。",
+            "优先按平台身份精确匹配；好感度只由用户手动维护。点卡片编辑画像，长按删除。",
             11f, sub).apply { setPadding(dp(2), dp(12), 0, 0) })
+    }
+
+    private fun linkBanner(): View = card().apply {
+        addView(text("关联当前会话", 14f, ink, bold = true))
+        addView(text(
+            "${appLabel(pendingLinkApp)} · $pendingLinkTitle",
+            13f, accent, bold = true).apply { setPadding(0, dp(5), 0, 0) })
+        addView(text(
+            "在下面选择现实中的同一个联系人。绑定后，不同 App 的聊天会共用同一份画像、历史和关系数据。",
+            11.5f, sub).apply { setPadding(0, dp(5), 0, 0) })
     }
 
     private fun affectionLegend(): View = card().apply {
