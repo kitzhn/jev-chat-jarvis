@@ -24,9 +24,9 @@
 
 **构建**
 - Debug 版本名升级为 `2.0.0-ultimate`。
-- Ultimate Debug 使用独立 applicationId 后缀 `.ultimate`，可与官方版同时安装。
+- Ultimate 稳定版使用独立 applicationId `io.github.kitzhn.jevultimate`；Debug 为 `.debug`，可与官方版和正式版同时安装。
 - 修复上游 Release 签名路径在 Linux CI 中导致 Debug 构建失败的问题。
-- GitHub Actions 使用 JDK 17 + Android SDK 35 自动产出 Debug APK。
+- GitHub Actions 使用 JDK 17 + Android SDK 35 自动产出 Debug APK；另提供基于 GitHub Secrets 的固定签名 Release 工作流。
 
 **已知限制**
 - 当前通过 GitHub Actions 和 Kotlin/Gradle 编译验证，仍建议在至少一台真实 Android 设备上完成 UI 与权限流程回归测试后再长期分发。
