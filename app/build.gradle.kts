@@ -10,8 +10,11 @@ plugins {
 // (storeFile / storePassword / keyAlias / keyPassword). Override the path with
 // the JEV_KEYSTORE_PROPS env var. Without it, release builds are unsigned.
 val releaseProps = Properties().apply {
-    val f = file(System.getenv("JEV_KEYSTORE_PROPS") ?: "H:/android/keys/jev-release.properties")
-    if (f.exists()) FileInputStream(f).use { load(it) }
+    val propsPath = System.getenv("JEV_KEYSTORE_PROPS")
+    if (!propsPath.isNullOrBlank()) {
+        val propsFile = file(propsPath)
+        if (propsFile.exists()) FileInputStream(propsFile).use { load(it) }
+    }
 }
 
 android {
@@ -22,8 +25,8 @@ android {
         applicationId = "com.jev.probe"
         minSdk = 30
         targetSdk = 35
-        versionCode = 5
-        versionName = "1.4"
+        versionCode = 20
+        versionName = "2.0.0"
 
         // ML Kit's bundled Chinese recognizer ships native libs for every ABI.
         // The target phone (and every phone this can run on: minSdk 30) is
@@ -45,6 +48,11 @@ android {
     }
 
     buildTypes {
+        debug {
+            applicationIdSuffix = ".ultimate"
+            versionNameSuffix = "-ultimate"
+            resValue("string", "app_name", "Jev Ultimate")
+        }
         release {
             isMinifyEnabled = false
             signingConfig = signingConfigs.findByName("release")

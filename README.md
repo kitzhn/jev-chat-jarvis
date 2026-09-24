@@ -16,6 +16,15 @@
 
 </div>
 
+> ## Jev Ultimate（本 Fork）
+>
+> 本 Fork 在上游基础上增加了：**跨 App 联系人身份、联系人画像、好感/信任/亲密关系模型、好感变化时间线、联系人关系网、显式重复联系人合并、API 快速方案以及无密钥配置导入/导出**。
+>
+> 给朋友使用请先看：[**Jev Ultimate 中文使用说明书**](docs/USER_GUIDE_ZH.md)  
+> OpenRouter 无密钥配置示例：[docs/api-config-openrouter.example.json](docs/api-config-openrouter.example.json)
+>
+> Ultimate Debug 版使用独立包名后缀，可与官方版并存。仓库不包含任何个人联系人数据或 API Key。
+
 ## ❤️赞助商
 
 > [想出现在这里？](#交流群--需求收集)

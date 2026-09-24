@@ -7,7 +7,12 @@ import org.json.JSONObject
 import java.io.File
 
 /** Note / contact / history counts, for the settings screen. */
-data class KbCounts(val notes: Int, val contacts: Int, val logLines: Int)
+data class KbCounts(
+    val notes: Int,
+    val contacts: Int,
+    val logLines: Int,
+    val relationEdges: Int = 0
+)
 
 /**
  * The knowledge-base store: three kinds of JSON file under `filesDir/kb`.
@@ -29,12 +34,16 @@ class KbStore private constructor(context: Context) {
     private val root: File get() = File(app.filesDir, "kb")
     private val notesFile: File get() = File(root, "notes.json")
     private val contactsFile: File get() = File(root, "contacts.json")
+    private val graphFile: File get() = File(root, "contact_relations.json")
     private fun logFile(contactId: String) = File(File(root, "logs"), "$contactId.json")
     private fun screenFile(contactId: String) = File(File(root, "logs"), "$contactId.screen.json")
+    private fun relationFile(contactId: String) = File(File(root, "relations"), "$contactId.json")
 
     private var notesCache: MutableList<Note>? = null
     private var contactsCache: MutableList<Contact>? = null
+    private var graphCache: MutableList<ContactRelation>? = null
     private val logCache = HashMap<String, MutableList<LogEntry>>()
+    private val relationCache = HashMap<String, MutableList<RelationshipEvent>>()
 
     /** Per contact: the comparison keys of the last screen written. See [appendLog]. */
     private val lastScreenCache = HashMap<String, List<String>>()
@@ -70,14 +79,240 @@ class KbStore private constructor(context: Context) {
 
     fun contact(id: String): Contact? = synchronized(lock) { loadContacts().firstOrNull { it.id == id } }
 
+    fun contactRelations(): List<ContactRelation> = synchronized(lock) { loadContactRelations().toList() }
+
+    fun relationsFor(contactId: String): List<ContactRelation> = synchronized(lock) {
+        loadContactRelations().filter { it.fromId == contactId || it.toId == contactId }
+    }
+
+    fun saveContactRelation(relation: ContactRelation): Boolean = synchronized(lock) {
+        if (relation.fromId.isBlank() || relation.toId.isBlank() || relation.fromId == relation.toId) {
+            return@synchronized false
+        }
+        if (loadContacts().none { it.id == relation.fromId } ||
+            loadContacts().none { it.id == relation.toId }) {
+            return@synchronized false
+        }
+        val list = loadContactRelations()
+        val i = list.indexOfFirst { it.id == relation.id }
+        val stamped = relation.copy(
+            type = relation.type.trim(),
+            strength = relation.strength.coerceIn(0, 100),
+            note = relation.note.trim(),
+            updatedAt = System.currentTimeMillis()
+        )
+        if (i >= 0) list[i] = stamped else list.add(stamped)
+        val ok = writeAtomic(graphFile, contactRelationsJson(list))
+        if (!ok) graphCache = null
+        ok
+    }
+
+    fun deleteContactRelation(id: String): Boolean = synchronized(lock) {
+        val list = loadContactRelations()
+        if (!list.removeAll { it.id == id }) return@synchronized true
+        val ok = writeAtomic(graphFile, contactRelationsJson(list))
+        if (!ok) graphCache = null
+        ok
+    }
+
+    fun relationContext(contactId: String, limit: Int = 8): List<String> = synchronized(lock) {
+        val names = loadContacts().associateBy({ it.id }, { it.name })
+        loadContactRelations()
+            .filter { it.fromId == contactId || it.toId == contactId }
+            .sortedByDescending { it.updatedAt }
+            .take(limit.coerceIn(0, 20))
+            .mapNotNull { edge ->
+                val otherId = if (edge.fromId == contactId) edge.toId else edge.fromId
+                val otherName = names[otherId]?.ifBlank { null } ?: return@mapNotNull null
+                buildString {
+                    append(otherName)
+                    if (edge.type.isNotBlank()) append("：").append(edge.type)
+                    append("（强度 ").append(edge.strength.coerceIn(0, 100)).append("/100）")
+                    if (edge.note.isNotBlank()) append("；").append(edge.note)
+                }
+            }
+    }
+
     fun saveContact(c: Contact): Boolean = synchronized(lock) {
         val list = loadContacts()
         val i = list.indexOfFirst { it.id == c.id }
-        val stamped = c.copy(updatedAt = System.currentTimeMillis())
+        val identities = c.identities
+            .map { it.copy(app = it.app.trim(), title = it.title.trim(), label = it.label.trim()) }
+            .filter { it.title.isNotBlank() }
+            .distinctBy { it.app + "\u0000" + normalizeName(it.title) }
+        val stamped = c.copy(
+            identities = identities,
+            affection = AffectionScale.clamp(c.affection),
+            trust = AffectionScale.clamp(c.trust),
+            closeness = AffectionScale.clamp(c.closeness),
+            updatedAt = System.currentTimeMillis()
+        )
         if (i >= 0) list[i] = stamped else list.add(stamped)
         val ok = writeAtomic(contactsFile, contactsJson(list))
         if (!ok) contactsCache = null
         ok
+    }
+
+    fun saveContactWithAffectionEvent(c: Contact, reason: String = "画像编辑"): Boolean = synchronized(lock) {
+        val old = loadContacts().firstOrNull { it.id == c.id }
+        val from = old?.affection
+        val to = AffectionScale.clamp(c.affection)
+        val ok = saveContact(c.copy(affection = to))
+        if (ok && from != null && from != to) {
+            appendRelationshipEvent(c.id, RelationshipEvent(
+                id = newId(),
+                ts = System.currentTimeMillis(),
+                delta = to - from,
+                fromScore = from,
+                toScore = to,
+                reason = reason.trim(),
+                source = "profile"
+            ))
+        }
+        ok
+    }
+
+    fun adjustAffection(id: String, delta: Int, reason: String = "", source: String = "quick"): Contact? = synchronized(lock) {
+        val current = loadContacts().firstOrNull { it.id == id } ?: return@synchronized null
+        val to = AffectionScale.clamp(current.affection + delta)
+        if (to == current.affection) return@synchronized current
+        val next = current.copy(affection = to)
+        if (!saveContact(next)) return@synchronized null
+        appendRelationshipEvent(id, RelationshipEvent(
+            id = newId(),
+            ts = System.currentTimeMillis(),
+            delta = to - current.affection,
+            fromScore = current.affection,
+            toScore = to,
+            reason = reason.trim(),
+            source = source
+        ))
+        return@synchronized contact(id)
+    }
+
+    fun linkIdentity(contactId: String, app: String, title: String, label: String = ""): Boolean = synchronized(lock) {
+        val contact = loadContacts().firstOrNull { it.id == contactId } ?: return@synchronized false
+        val cleanTitle = displayName(title)
+        if (cleanTitle.isBlank()) return@synchronized false
+        val cleanApp = app.trim()
+        val exists = contact.identities.any {
+            it.app == cleanApp && normalizeName(it.title) == normalizeName(cleanTitle)
+        }
+        val identities = if (exists) contact.identities else
+            contact.identities + PlatformIdentity(cleanApp, cleanTitle, label.trim())
+        val apps = if (cleanApp.isBlank() || cleanApp in contact.apps) contact.apps else contact.apps + cleanApp
+        val aliases = if ((listOf(contact.name) + contact.aliases).any { normalizeName(it) == normalizeName(cleanTitle) })
+            contact.aliases else contact.aliases + cleanTitle
+        saveContact(contact.copy(identities = identities, apps = apps, aliases = aliases))
+    }
+
+    fun unlinkIdentity(contactId: String, app: String, title: String): Boolean = synchronized(lock) {
+        val contact = loadContacts().firstOrNull { it.id == contactId } ?: return@synchronized false
+        val identities = contact.identities.filterNot {
+            it.app == app && normalizeName(it.title) == normalizeName(title)
+        }
+        saveContact(contact.copy(identities = identities))
+    }
+
+    /**
+     * Explicit UI action: bind the current app/title identity to [targetId].
+     * If that exact identity already belongs to another saved contact, merge the
+     * duplicate into the selected target first.
+     */
+    fun linkCurrentIdentityToContact(targetId: String, app: String, title: String): String = synchronized(lock) {
+        val target = loadContacts().firstOrNull { it.id == targetId }
+            ?: return@synchronized "目标联系人不存在"
+        val want = normalizeName(title)
+        if (want.isBlank()) return@synchronized "当前会话标题为空"
+        val owner = loadContacts().firstOrNull { c ->
+            c.id != targetId && c.identities.any { it.app == app && normalizeName(it.title) == want }
+        }
+        if (owner != null && !mergeContacts(targetId, owner.id)) {
+            return@synchronized "合并旧联系人失败"
+        }
+        return@synchronized if (linkIdentity(targetId, app, title, appLabelForData(app))) {
+            if (owner != null) "已合并「${owner.name}」并关联到「${target.name}」"
+            else "已关联到「${target.name}」"
+        } else "关联失败"
+    }
+
+    private fun mergeContacts(targetId: String, sourceId: String): Boolean {
+        if (targetId == sourceId) return true
+        val list = loadContacts()
+        val target = list.firstOrNull { it.id == targetId } ?: return false
+        val source = list.firstOrNull { it.id == sourceId } ?: return false
+
+        fun joined(a: String, b: String): String = when {
+            a.isBlank() -> b
+            b.isBlank() || a.contains(b) -> a
+            else -> a.trim() + "\n" + b.trim()
+        }
+
+        val merged = target.copy(
+            aliases = (target.aliases + source.name + source.aliases)
+                .map { it.trim() }.filter { it.isNotEmpty() }.distinct(),
+            apps = (target.apps + source.apps).distinct(),
+            identities = (target.identities + source.identities).distinctBy {
+                it.app + "\u0000" + normalizeName(it.title)
+            },
+            relationship = target.relationship.ifBlank { source.relationship },
+            relationshipStage = target.relationshipStage.ifBlank { source.relationshipStage },
+            profileTags = (target.profileTags + source.profileTags).distinct(),
+            traits = joined(target.traits, source.traits),
+            communicationStyle = joined(target.communicationStyle, source.communicationStyle),
+            boundaries = joined(target.boundaries, source.boundaries),
+            notes = joined(target.notes, source.notes),
+            autoSummary = joined(target.autoSummary, source.autoSummary)
+        )
+        if (!saveContact(merged)) return false
+
+        val mergedLog = (loadLog(targetId) + loadLog(sourceId))
+            .sortedBy { it.ts }
+            .distinctBy { "${it.ts}\u0000${it.side}\u0000${it.app}\u0000${it.text}" }
+            .takeLast(MAX_LOG)
+            .toMutableList()
+        if (!writeAtomic(logFile(targetId), logJson(mergedLog))) return false
+        logCache[targetId] = mergedLog
+
+        val mergedEvents = (loadRelationshipEvents(targetId) + loadRelationshipEvents(sourceId))
+            .sortedBy { it.ts }
+            .distinctBy { it.id }
+            .takeLast(MAX_RELATION_EVENTS)
+            .toMutableList()
+        if (!writeAtomic(relationFile(targetId), relationshipEventsJson(mergedEvents))) return false
+        relationCache[targetId] = mergedEvents
+
+        val rewired = loadContactRelations()
+            .map { edge ->
+                edge.copy(
+                    fromId = if (edge.fromId == sourceId) targetId else edge.fromId,
+                    toId = if (edge.toId == sourceId) targetId else edge.toId
+                )
+            }
+            .filter { it.fromId != it.toId }
+            .distinctBy { edge ->
+                val pair = listOf(edge.fromId, edge.toId).sorted().joinToString("|")
+                pair + "\u0000" + edge.type.trim().lowercase()
+            }
+            .toMutableList()
+        if (!writeAtomic(graphFile, contactRelationsJson(rewired))) {
+            graphCache = null
+            return false
+        }
+        graphCache = rewired
+
+        list.removeAll { it.id == sourceId }
+        if (!writeAtomic(contactsFile, contactsJson(list))) {
+            contactsCache = null
+            return false
+        }
+        logCache.remove(sourceId)
+        relationCache.remove(sourceId)
+        lastScreenCache.remove(sourceId)
+        runCatching { logFile(sourceId).delete() }
+        runCatching { screenFile(sourceId).delete() }
+        runCatching { relationFile(sourceId).delete() }
+        return true
     }
 
     /** Removes the contact and its history file. */
@@ -89,9 +324,17 @@ class KbStore private constructor(context: Context) {
             if (!ok) contactsCache = null
         }
         logCache.remove(id)
+        relationCache.remove(id)
         lastScreenCache.remove(id)
         runCatching { logFile(id).delete() }
         runCatching { screenFile(id).delete() }
+        runCatching { relationFile(id).delete() }
+        val edges = loadContactRelations()
+        if (edges.removeAll { it.fromId == id || it.toId == id }) {
+            val graphOk = writeAtomic(graphFile, contactRelationsJson(edges))
+            if (!graphOk) graphCache = null
+            ok = ok && graphOk
+        }
         ok
     }
 
@@ -107,6 +350,13 @@ class KbStore private constructor(context: Context) {
         synchronized(lock) {
             val want = normalizeName(title)
             if (want.isEmpty()) return null
+            if (app.isNotBlank()) {
+                loadContacts().firstOrNull { c ->
+                    c.identities.any { identity ->
+                        identity.app == app && normalizeName(identity.title) == want
+                    }
+                }?.let { return it }
+            }
             val hits = loadContacts().filter { c ->
                 normalizeName(c.name) == want || c.aliases.any { normalizeName(it) == want }
             }
@@ -129,19 +379,19 @@ class KbStore private constructor(context: Context) {
                 id = newId(),
                 name = display,
                 aliases = aliases,
-                apps = if (app.isBlank()) emptyList() else listOf(app)
+                apps = if (app.isBlank()) emptyList() else listOf(app),
+                identities = if (app.isBlank()) emptyList() else listOf(
+                    PlatformIdentity(app = app, title = display, label = "")
+                )
             ))
             return "已存为联系人「${display}」"
         }
-        val apps = if (app.isBlank() || existing.apps.contains(app)) existing.apps else existing.apps + app
-        val raw = title.trim()
-        val known = (listOf(existing.name) + existing.aliases).map { normalizeName(it) }
-        val aliases = if (raw.isNotEmpty() && normalizeName(raw) !in known)
-            existing.aliases + raw else existing.aliases
-        if (apps == existing.apps && aliases == existing.aliases)
-            return "联系人「${existing.name}」已存在"
-        saveContact(existing.copy(apps = apps, aliases = aliases))
-        return "已并入联系人「${existing.name}」"
+        val alreadyLinked = existing.identities.any {
+            it.app == app && normalizeName(it.title) == normalizeName(display)
+        }
+        if (alreadyLinked) return "联系人「${existing.name}」已关联当前会话"
+        linkIdentity(existing.id, app, display)
+        return "已把当前会话并入联系人「${existing.name}」"
     }
 
     // ---------------------------------------------------------------- history
@@ -232,6 +482,25 @@ class KbStore private constructor(context: Context) {
 
     fun logSize(contactId: String): Int = synchronized(lock) { loadLog(contactId).size }
 
+    fun lastInteractionAt(contactId: String): Long = synchronized(lock) {
+        loadLog(contactId).lastOrNull()?.ts ?: 0L
+    }
+
+    fun relationshipEvents(contactId: String, n: Int = 20): List<RelationshipEvent> = synchronized(lock) {
+        if (n <= 0) return@synchronized emptyList()
+        val list = loadRelationshipEvents(contactId)
+        if (list.size <= n) list.toList() else list.takeLast(n)
+    }
+
+    private fun appendRelationshipEvent(contactId: String, event: RelationshipEvent): Boolean {
+        val list = loadRelationshipEvents(contactId)
+        list.add(event)
+        while (list.size > MAX_RELATION_EVENTS) list.removeAt(0)
+        val ok = writeAtomic(relationFile(contactId), relationshipEventsJson(list))
+        if (!ok) relationCache.remove(contactId)
+        return ok
+    }
+
     fun clearLog(contactId: String) = synchronized(lock) {
         logCache.remove(contactId)
         lastScreenCache.remove(contactId)
@@ -272,7 +541,7 @@ class KbStore private constructor(context: Context) {
         val contacts = loadContacts()
         var lines = 0
         contacts.forEach { lines += loadLog(it.id).size }
-        KbCounts(loadNotes().size, contacts.size, lines)
+        KbCounts(loadNotes().size, contacts.size, lines, loadContactRelations().size)
     }
 
     /**
@@ -282,7 +551,9 @@ class KbStore private constructor(context: Context) {
     fun clearAll() = synchronized(lock) {
         notesCache = null
         contactsCache = null
+        graphCache = null
         logCache.clear()
+        relationCache.clear()
         lastScreenCache.clear()
         runCatching { root.deleteRecursively() }
         Log.i(TAG, "kb cleared")
@@ -325,7 +596,16 @@ class KbStore private constructor(context: Context) {
                     name = o.optString("name"),
                     aliases = strList(o.optJSONArray("aliases")),
                     apps = strList(o.optJSONArray("apps")),
+                    identities = identityList(o.optJSONArray("identities")),
                     relationship = o.optString("relationship"),
+                    relationshipStage = o.optString("relationshipStage"),
+                    affection = AffectionScale.clamp(o.optInt("affection", 50)),
+                    trust = AffectionScale.clamp(o.optInt("trust", 50)),
+                    closeness = AffectionScale.clamp(o.optInt("closeness", 50)),
+                    profileTags = strList(o.optJSONArray("profileTags")),
+                    traits = o.optString("traits"),
+                    communicationStyle = o.optString("communicationStyle"),
+                    boundaries = o.optString("boundaries"),
                     notes = o.optString("notes"),
                     autoSummary = o.optString("autoSummary"),
                     updatedAt = o.optLong("updatedAt", 0L)
@@ -333,6 +613,31 @@ class KbStore private constructor(context: Context) {
             }
         }
         if (loaded.trustworthy) contactsCache = list
+        return list
+    }
+
+    private fun loadContactRelations(): MutableList<ContactRelation> {
+        graphCache?.let { return it }
+        val list = ArrayList<ContactRelation>()
+        val loaded = readJsonArray(graphFile)
+        loaded.arr?.let { arr ->
+            for (i in 0 until arr.length()) {
+                val o = arr.optJSONObject(i) ?: continue
+                val fromId = o.optString("fromId").trim()
+                val toId = o.optString("toId").trim()
+                if (fromId.isBlank() || toId.isBlank() || fromId == toId) continue
+                list.add(ContactRelation(
+                    id = o.optString("id").ifBlank { newId() },
+                    fromId = fromId,
+                    toId = toId,
+                    type = o.optString("type"),
+                    strength = o.optInt("strength", 50).coerceIn(0, 100),
+                    note = o.optString("note"),
+                    updatedAt = o.optLong("updatedAt", 0L)
+                ))
+            }
+        }
+        if (loaded.trustworthy) graphCache = list
         return list
     }
 
@@ -352,6 +657,28 @@ class KbStore private constructor(context: Context) {
             }
         }
         if (loaded.trustworthy) logCache[contactId] = list
+        return list
+    }
+
+    private fun loadRelationshipEvents(contactId: String): MutableList<RelationshipEvent> {
+        relationCache[contactId]?.let { return it }
+        val list = ArrayList<RelationshipEvent>()
+        val loaded = readJsonArray(relationFile(contactId))
+        loaded.arr?.let { arr ->
+            for (i in 0 until arr.length()) {
+                val o = arr.optJSONObject(i) ?: continue
+                list.add(RelationshipEvent(
+                    id = o.optString("id").ifBlank { newId() },
+                    ts = o.optLong("ts", 0L),
+                    delta = o.optInt("delta", 0),
+                    fromScore = AffectionScale.clamp(o.optInt("fromScore", 50)),
+                    toScore = AffectionScale.clamp(o.optInt("toScore", 50)),
+                    reason = o.optString("reason"),
+                    source = o.optString("source", "manual")
+                ))
+            }
+        }
+        if (loaded.trustworthy) relationCache[contactId] = list
         return list
     }
 
@@ -378,10 +705,41 @@ class KbStore private constructor(context: Context) {
                 .put("name", c.name)
                 .put("aliases", JSONArray(c.aliases))
                 .put("apps", JSONArray(c.apps))
+                .put("identities", JSONArray().apply {
+                    c.identities.forEach { identity ->
+                        put(JSONObject()
+                            .put("app", identity.app)
+                            .put("title", identity.title)
+                            .put("label", identity.label))
+                    }
+                })
                 .put("relationship", c.relationship)
+                .put("relationshipStage", c.relationshipStage)
+                .put("affection", AffectionScale.clamp(c.affection))
+                .put("trust", AffectionScale.clamp(c.trust))
+                .put("closeness", AffectionScale.clamp(c.closeness))
+                .put("profileTags", JSONArray(c.profileTags))
+                .put("traits", c.traits)
+                .put("communicationStyle", c.communicationStyle)
+                .put("boundaries", c.boundaries)
                 .put("notes", c.notes)
                 .put("autoSummary", c.autoSummary)
                 .put("updatedAt", c.updatedAt))
+        }
+        return arr.toString()
+    }
+
+    private fun contactRelationsJson(list: List<ContactRelation>): String {
+        val arr = JSONArray()
+        list.forEach { edge ->
+            arr.put(JSONObject()
+                .put("id", edge.id)
+                .put("fromId", edge.fromId)
+                .put("toId", edge.toId)
+                .put("type", edge.type)
+                .put("strength", edge.strength.coerceIn(0, 100))
+                .put("note", edge.note)
+                .put("updatedAt", edge.updatedAt))
         }
         return arr.toString()
     }
@@ -396,6 +754,38 @@ class KbStore private constructor(context: Context) {
                 .put("app", e.app))
         }
         return arr.toString()
+    }
+
+    private fun relationshipEventsJson(list: List<RelationshipEvent>): String {
+        val arr = JSONArray()
+        list.forEach { e ->
+            arr.put(JSONObject()
+                .put("id", e.id)
+                .put("ts", e.ts)
+                .put("delta", e.delta)
+                .put("fromScore", e.fromScore)
+                .put("toScore", e.toScore)
+                .put("reason", e.reason)
+                .put("source", e.source))
+        }
+        return arr.toString()
+    }
+
+    private fun identityList(arr: JSONArray?): List<PlatformIdentity> {
+        arr ?: return emptyList()
+        val out = ArrayList<PlatformIdentity>(arr.length())
+        for (i in 0 until arr.length()) {
+            val o = arr.optJSONObject(i) ?: continue
+            val title = o.optString("title").trim()
+            if (title.isNotEmpty()) {
+                out.add(PlatformIdentity(
+                    app = o.optString("app").trim(),
+                    title = title,
+                    label = o.optString("label").trim()
+                ))
+            }
+        }
+        return out
     }
 
     /**
@@ -470,9 +860,20 @@ class KbStore private constructor(context: Context) {
 
     private fun key(side: String, text: String) = side + "\u0000" + text
 
+    private fun appLabelForData(pkg: String): String = when (pkg) {
+        "com.tencent.mobileqq" -> "QQ"
+        "com.ss.android.lark" -> "飞书"
+        "com.twitter.android" -> "X"
+        "com.tencent.mm" -> "微信"
+        "org.telegram.messenger" -> "Telegram"
+        "com.alibaba.android.rimet" -> "钉钉"
+        else -> pkg
+    }
+
     companion object {
         private const val TAG = "JEVASSIST"
         const val MAX_LOG = 300
+        const val MAX_RELATION_EVENTS = 100
 
         @Volatile private var instance: KbStore? = null
 
