@@ -29,6 +29,7 @@ import com.jev.probe.core.kb.KbStore
 import com.jev.probe.jev.JudgeClient
 import com.jev.probe.jev.ReplyClient
 import com.jev.probe.jev.VisionClient
+import org.json.JSONObject
 import java.util.concurrent.Executors
 import kotlin.math.roundToInt
 
@@ -307,6 +308,42 @@ class SettingsActivity : AppCompatActivity() {
         visionCard.addView(visionResult)
         root.addView(visionCard)
 
+        // --- 快速 API 配置 / 分享模板 ---
+        val apiQuickCard = card()
+        apiQuickCard.addView(cardTitle("快速 API 配置"))
+        apiQuickCard.addView(text(
+            "给朋友使用时，推荐先套用一个模板，再各自填写自己的 API Key。配置导出永远不包含密钥。",
+            12f, sub))
+        apiQuickCard.addView(cardBtn("推荐：OpenRouter 一把 Key") {
+            prefs.judgeProvider = Prefs.PROVIDER_OPENROUTER
+            prefs.judgeBaseUrl = Prefs.DEFAULT_JUDGE_BASE_OPENROUTER
+            prefs.judgeModel = Prefs.DEFAULT_JUDGE_MODEL_OPENROUTER
+            prefs.replyBaseUrl = Prefs.DEFAULT_REPLY_BASE
+            prefs.replyModel = Prefs.DEFAULT_REPLY_MODEL
+            prefs.replyKey = ""
+            prefs.visionBaseUrl = Prefs.DEFAULT_VISION_BASE
+            prefs.visionModel = Prefs.DEFAULT_VISION_MODEL
+            prefs.visionKey = ""
+            Toast.makeText(this, "已套用。现在只需在判断接口填写 OpenRouter Key。", Toast.LENGTH_LONG).show()
+            recreate()
+        })
+        apiQuickCard.addView(cardBtn("回复切换为 DeepSeek 官方") {
+            prefs.replyBaseUrl = Prefs.DEEPSEEK_BASE
+            prefs.replyModel = Prefs.DEEPSEEK_MODEL
+            Toast.makeText(this, "已切换回复接口；请填写 DeepSeek Key。", Toast.LENGTH_SHORT).show()
+            recreate()
+        })
+        apiQuickCard.addView(cardBtn("复制 API 配置模板（不含密钥）") {
+            val json = exportApiConfigJson()
+            val cm = getSystemService(CLIPBOARD_SERVICE) as android.content.ClipboardManager
+            cm.setPrimaryClip(android.content.ClipData.newPlainText("jev_api_config", json))
+            Toast.makeText(this, "配置模板已复制，不含任何 API Key", Toast.LENGTH_SHORT).show()
+        })
+        apiQuickCard.addView(cardBtn("从 JSON 导入 API 配置") {
+            showImportApiConfigDialog()
+        })
+        root.addView(apiQuickCard)
+
         // =================== 分析 ===================
         root.addView(section("分析"))
         val card2 = card()
@@ -346,7 +383,7 @@ class SettingsActivity : AppCompatActivity() {
             val c = KbStore.get(this).counts()
             androidx.appcompat.app.AlertDialog.Builder(this)
                 .setTitle("清空知识库与历史")
-                .setMessage("将删除 ${c.notes} 条笔记、${c.contacts} 个联系人、${c.logLines} 条聊天历史。" +
+                .setMessage("将删除 ${c.notes} 条笔记、${c.contacts} 个联系人、${c.relationEdges} 条关系边、${c.logLines} 条聊天历史。" +
                     "密钥、白名单等设置不受影响。不可恢复。")
                 .setPositiveButton("清空") { _, _ ->
                     KbStore.get(this).clearAll()
@@ -395,6 +432,7 @@ class SettingsActivity : AppCompatActivity() {
         aboutCard.addView(text(
             "这个 App 会读取你当前聊天窗口的文字，发给你自己配置的模型接口做判断和起草回复。作者不运营服务器，收不到你的数据。",
             12f, sub))
+        aboutCard.addView(cardBtn("使用说明书") { openUrl(GUIDE_URL) })
         aboutCard.addView(cardBtn("隐私政策") { openUrl(PRIVACY_URL) })
         aboutCard.addView(cardBtn("开源仓库") { openUrl(REPO_URL) })
         aboutCard.addView(text(versionLabel(), 11f, sub).apply { setPadding(0, dp(10), 0, dp(2)) })
@@ -501,6 +539,48 @@ class SettingsActivity : AppCompatActivity() {
         Prefs.PROVIDER_VERCEL -> Prefs.DEFAULT_JUDGE_MODEL_VERCEL
         Prefs.PROVIDER_ZEN -> Prefs.DEFAULT_JUDGE_MODEL_ZEN
         else -> Prefs.DEFAULT_JUDGE_MODEL_OPENROUTER
+    }
+
+    private fun exportApiConfigJson(): String = JSONObject()
+        .put("format", "jev-ultimate-api-config-v1")
+        .put("judgeProvider", prefs.judgeProvider)
+        .put("judgeBaseUrl", prefs.judgeBaseUrl)
+        .put("judgeModel", prefs.judgeModel)
+        .put("replyBaseUrl", prefs.replyBaseUrl)
+        .put("replyModel", prefs.replyModel)
+        .put("visionBaseUrl", prefs.visionBaseUrl)
+        .put("visionModel", prefs.visionModel)
+        .toString(2)
+
+    private fun showImportApiConfigDialog() {
+        val input = edit("", "{\n  \"format\": \"jev-ultimate-api-config-v1\",\n  ...\n}").apply {
+            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE
+            minLines = 10
+            gravity = Gravity.TOP
+        }
+        androidx.appcompat.app.AlertDialog.Builder(this)
+            .setTitle("导入 API 配置")
+            .setMessage("只导入提供商、地址和模型；不会读取、覆盖或导入任何 API Key。")
+            .setView(input)
+            .setPositiveButton("导入") { _, _ ->
+                val raw = input.text.toString().trim()
+                try {
+                    val o = JSONObject(raw)
+                    prefs.judgeProvider = o.optString("judgeProvider", prefs.judgeProvider)
+                    prefs.judgeBaseUrl = o.optString("judgeBaseUrl", prefs.judgeBaseUrl)
+                    prefs.judgeModel = o.optString("judgeModel", prefs.judgeModel)
+                    prefs.replyBaseUrl = o.optString("replyBaseUrl", prefs.replyBaseUrl)
+                    prefs.replyModel = o.optString("replyModel", prefs.replyModel)
+                    prefs.visionBaseUrl = o.optString("visionBaseUrl", prefs.visionBaseUrl)
+                    prefs.visionModel = o.optString("visionModel", prefs.visionModel)
+                    Toast.makeText(this, "API 配置已导入，请自行填写密钥并测试", Toast.LENGTH_LONG).show()
+                    recreate()
+                } catch (e: Exception) {
+                    Toast.makeText(this, "JSON 无法解析：${e.javaClass.simpleName}", Toast.LENGTH_LONG).show()
+                }
+            }
+            .setNegativeButton("取消", null)
+            .show()
     }
 
     /**
@@ -676,6 +756,8 @@ class SettingsActivity : AppCompatActivity() {
         private const val SCRATCH_VISION = "jev_probe_scratch_vision"
 
         private const val PRIVACY_URL = "https://chatjevs.com/privacy.html"
-        private const val REPO_URL = "https://github.com/jev-chat/jev-chat-jarvis"
+        private const val REPO_URL = "https://github.com/kitzhn/jev-chat-jarvis"
+        private const val GUIDE_URL =
+            "https://github.com/kitzhn/jev-chat-jarvis/blob/main/docs/USER_GUIDE_ZH.md"
     }
 }
