@@ -93,14 +93,7 @@ data class ChatContext(
 ) {
 
     /** True when there is nothing extra to inject (then no field is sent at all). */
-    fun isEmpty(): Boolean = history.isEmpty() && notes.isEmpty() &&
-        (contact == null || (contact.relationship.isBlank() &&
-            contact.relationshipStage.isBlank() &&
-            contact.profileTags.isEmpty() &&
-            contact.traits.isBlank() &&
-            contact.communicationStyle.isBlank() &&
-            contact.boundaries.isBlank() &&
-            contact.notes.isBlank() && contact.autoSummary.isBlank()))
+    fun isEmpty(): Boolean = history.isEmpty() && notes.isEmpty() && contact == null
 
     /**
      * The `background` string injected into Jev's state and the reply prompt:
@@ -116,6 +109,7 @@ data class ChatContext(
     fun background(defaultRelationship: String): String {
         val sb = StringBuilder()
         contact?.let { c ->
+            sb.append("关系模型说明：以下分数和画像由用户手动维护，仅作回复背景，不代表对方真实心理。").append('\n')
             val rel = c.relationship.trim()
             if (rel.isNotEmpty()) sb.append("关系：").append(rel).append('\n')
             if (c.relationshipStage.isNotBlank()) sb.append("关系阶段：")
