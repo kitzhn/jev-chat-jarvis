@@ -153,6 +153,88 @@ class KbStore private constructor(context: Context) {
         saveContact(contact.copy(identities = identities))
     }
 
+    /**
+     * Explicit UI action: bind the current app/title identity to [targetId].
+     * If that exact identity already belongs to another saved contact, merge the
+     * duplicate into the selected target first.
+     */
+    fun linkCurrentIdentityToContact(targetId: String, app: String, title: String): String = synchronized(lock) {
+        val target = loadContacts().firstOrNull { it.id == targetId }
+            ?: return@synchronized "目标联系人不存在"
+        val want = normalizeName(title)
+        if (want.isBlank()) return@synchronized "当前会话标题为空"
+        val owner = loadContacts().firstOrNull { c ->
+            c.id != targetId && c.identities.any { it.app == app && normalizeName(it.title) == want }
+        }
+        if (owner != null && !mergeContacts(targetId, owner.id)) {
+            return@synchronized "合并旧联系人失败"
+        }
+        return@synchronized if (linkIdentity(targetId, app, title, appLabelForData(app))) {
+            if (owner != null) "已合并「${owner.name}」并关联到「${target.name}」"
+            else "已关联到「${target.name}」"
+        } else "关联失败"
+    }
+
+    private fun mergeContacts(targetId: String, sourceId: String): Boolean {
+        if (targetId == sourceId) return true
+        val list = loadContacts()
+        val target = list.firstOrNull { it.id == targetId } ?: return false
+        val source = list.firstOrNull { it.id == sourceId } ?: return false
+
+        fun joined(a: String, b: String): String = when {
+            a.isBlank() -> b
+            b.isBlank() || a.contains(b) -> a
+            else -> a.trim() + "\n" + b.trim()
+        }
+
+        val merged = target.copy(
+            aliases = (target.aliases + source.name + source.aliases)
+                .map { it.trim() }.filter { it.isNotEmpty() }.distinct(),
+            apps = (target.apps + source.apps).distinct(),
+            identities = (target.identities + source.identities).distinctBy {
+                it.app + "\u0000" + normalizeName(it.title)
+            },
+            relationship = target.relationship.ifBlank { source.relationship },
+            relationshipStage = target.relationshipStage.ifBlank { source.relationshipStage },
+            profileTags = (target.profileTags + source.profileTags).distinct(),
+            traits = joined(target.traits, source.traits),
+            communicationStyle = joined(target.communicationStyle, source.communicationStyle),
+            boundaries = joined(target.boundaries, source.boundaries),
+            notes = joined(target.notes, source.notes),
+            autoSummary = joined(target.autoSummary, source.autoSummary)
+        )
+        if (!saveContact(merged)) return false
+
+        val mergedLog = (loadLog(targetId) + loadLog(sourceId))
+            .sortedBy { it.ts }
+            .distinctBy { "${it.ts}\u0000${it.side}\u0000${it.app}\u0000${it.text}" }
+            .takeLast(MAX_LOG)
+            .toMutableList()
+        if (!writeAtomic(logFile(targetId), logJson(mergedLog))) return false
+        logCache[targetId] = mergedLog
+
+        val mergedEvents = (loadRelationshipEvents(targetId) + loadRelationshipEvents(sourceId))
+            .sortedBy { it.ts }
+            .distinctBy { it.id }
+            .takeLast(MAX_RELATION_EVENTS)
+            .toMutableList()
+        if (!writeAtomic(relationFile(targetId), relationshipEventsJson(mergedEvents))) return false
+        relationCache[targetId] = mergedEvents
+
+        list.removeAll { it.id == sourceId }
+        if (!writeAtomic(contactsFile, contactsJson(list))) {
+            contactsCache = null
+            return false
+        }
+        logCache.remove(sourceId)
+        relationCache.remove(sourceId)
+        lastScreenCache.remove(sourceId)
+        runCatching { logFile(sourceId).delete() }
+        runCatching { screenFile(sourceId).delete() }
+        runCatching { relationFile(sourceId).delete() }
+        true
+    }
+
     /** Removes the contact and its history file. */
     fun deleteContact(id: String): Boolean = synchronized(lock) {
         val list = loadContacts()
@@ -650,6 +732,16 @@ class KbStore private constructor(context: Context) {
     }
 
     private fun key(side: String, text: String) = side + "\u0000" + text
+
+    private fun appLabelForData(pkg: String): String = when (pkg) {
+        "com.tencent.mobileqq" -> "QQ"
+        "com.ss.android.lark" -> "飞书"
+        "com.twitter.android" -> "X"
+        "com.tencent.mm" -> "微信"
+        "org.telegram.messenger" -> "Telegram"
+        "com.alibaba.android.rimet" -> "钉钉"
+        else -> pkg
+    }
 
     companion object {
         private const val TAG = "JEVASSIST"
