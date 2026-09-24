@@ -38,6 +38,17 @@ data class RelationshipEvent(
     val source: String = "manual"
 )
 
+/** One user-maintained edge between two contacts in the local relationship graph. */
+data class ContactRelation(
+    val id: String,
+    val fromId: String,
+    val toId: String,
+    val type: String,
+    val strength: Int = 50,
+    val note: String = "",
+    val updatedAt: Long = System.currentTimeMillis()
+)
+
 /**
  * One person (or group) the user chats with. [identities] is the preferred
  * cross-app mapping: each entry binds an app package + conversation title to
@@ -109,11 +120,14 @@ data class LogEntry(val side: String, val text: String, val ts: Long, val app: S
 data class ChatContext(
     val contact: Contact?,
     val history: List<LogEntry>,
-    val notes: List<Note>
+    val notes: List<Note>,
+    /** Human-readable direct edges involving this contact, already name-resolved. */
+    val relationshipGraph: List<String> = emptyList()
 ) {
 
     /** True when there is nothing extra to inject (then no field is sent at all). */
-    fun isEmpty(): Boolean = history.isEmpty() && notes.isEmpty() && contact == null
+    fun isEmpty(): Boolean =
+        history.isEmpty() && notes.isEmpty() && contact == null && relationshipGraph.isEmpty()
 
     /**
      * The `background` string injected into Jev's state and the reply prompt:
@@ -160,6 +174,10 @@ data class ChatContext(
                 .append(c.notes.trim()).append('\n')
             if (c.autoSummary.isNotBlank()) sb.append("过往摘要：")
                 .append(c.autoSummary.trim()).append('\n')
+        }
+        if (relationshipGraph.isNotEmpty()) {
+            sb.append("联系人关系网络（用户手动维护）：").append('\n')
+            relationshipGraph.forEach { sb.append("- ").append(it).append('\n') }
         }
         notes.forEach { n ->
             sb.append(n.title.trim()).append(": ").append(n.content.trim()).append('\n')
