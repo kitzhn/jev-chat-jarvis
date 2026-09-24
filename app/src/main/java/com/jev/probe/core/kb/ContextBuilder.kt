@@ -57,9 +57,11 @@ object ContextBuilder {
         while (cost(trimmedHits, trimmedHistory) > BUDGET_CHARS && trimmedHits.isNotEmpty())
             trimmedHits.removeAt(trimmedHits.size - 1)
 
+        val graph = if (contact != null) store.relationContext(contact.id) else emptyList()
+
         Log.d(TAG, "context: contact=${contact != null} notes=${alwaysOn.size + trimmedHits.size} " +
-            "history=${trimmedHistory.size}")
-        return ChatContext(contact, trimmedHistory, alwaysOn + trimmedHits)
+            "history=${trimmedHistory.size} graph=${graph.size}")
+        return ChatContext(contact, trimmedHistory, alwaysOn + trimmedHits, graph)
     }
 
     /**
