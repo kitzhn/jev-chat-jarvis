@@ -22,7 +22,7 @@ android {
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.jev.probe"
+        applicationId = "io.github.kitzhn.jevultimate"
         minSdk = 30
         targetSdk = 35
         versionCode = 20
@@ -49,9 +49,9 @@ android {
 
     buildTypes {
         debug {
-            applicationIdSuffix = ".ultimate"
-            versionNameSuffix = "-ultimate"
-            resValue("string", "app_name", "Jev Ultimate")
+            applicationIdSuffix = ".debug"
+            versionNameSuffix = "-debug"
+            resValue("string", "app_name", "Jev Ultimate Dev")
         }
         release {
             isMinifyEnabled = false
