@@ -328,6 +328,6 @@ class Prefs(context: Context, prefsName: String = PREFS_MAIN) {
         const val DEFAULT_VISION_MODEL = "qwen/qwen2.5-vl-72b-instruct"
         const val DASHSCOPE_VISION_MODEL = "qwen-vl-max"
 
-        const val DEFAULT_REL = "对方是我的伴侣；from=me 的是我发的，from=other 的是对方发的"
+        const val DEFAULT_REL = "对方是我正在聊天的联系人；优先使用联系人画像和关系上下文；from=me 的是我发的，from=other 的是对方发的"
     }
 }
