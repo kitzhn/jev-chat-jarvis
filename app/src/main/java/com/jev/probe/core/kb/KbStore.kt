@@ -232,7 +232,7 @@ class KbStore private constructor(context: Context) {
         runCatching { logFile(sourceId).delete() }
         runCatching { screenFile(sourceId).delete() }
         runCatching { relationFile(sourceId).delete() }
-        true
+        return true
     }
 
     /** Removes the contact and its history file. */
