@@ -9,16 +9,19 @@ import android.util.TypedValue
 import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
+import android.widget.ArrayAdapter
 import android.widget.EditText
 import android.widget.LinearLayout
 import android.widget.ProgressBar
 import android.widget.ScrollView
+import android.widget.Spinner
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import com.jev.probe.core.kb.AffectionScale
 import com.jev.probe.core.kb.Contact
+import com.jev.probe.core.kb.ContactRelation
 import com.jev.probe.core.kb.KbStore
 import com.jev.probe.core.kb.Note
 import com.jev.probe.core.kb.PlatformIdentity
@@ -41,7 +44,7 @@ class KnowledgeActivity : AppCompatActivity() {
     private lateinit var store: KbStore
     private lateinit var container: LinearLayout
 
-    /** 0 = notes, 1 = contacts. */
+    /** 0 = notes, 1 = contacts, 2 = relationship graph. */
     private var tab = 0
     private var pendingLinkApp: String = ""
     private var pendingLinkTitle: String = ""
@@ -82,7 +85,11 @@ class KnowledgeActivity : AppCompatActivity() {
         container.addView(text("只存在本机，不上传。联系人可绑定多个 App 身份；分析时优先按“平台 + 会话标题”精确匹配。",
             12f, sub).apply { setPadding(0, dp(6), 0, dp(4)) })
         container.addView(tabs())
-        if (tab == 0) renderNotes() else renderContacts()
+        when (tab) {
+            0 -> renderNotes()
+            1 -> renderContacts()
+            else -> renderRelations()
+        }
     }
 
     private fun tabs(): View {
@@ -92,7 +99,7 @@ class KnowledgeActivity : AppCompatActivity() {
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.WRAP_CONTENT).apply { topMargin = dp(12) }
         }
-        listOf("笔记", "联系人").forEachIndexed { i, name ->
+        listOf("笔记", "联系人", "关系网").forEachIndexed { i, name ->
             val pill = TextView(this).apply {
                 text = name; textSize = 13f; gravity = Gravity.CENTER
                 setPadding(dp(18), dp(8), dp(18), dp(8))
@@ -317,6 +324,11 @@ class KnowledgeActivity : AppCompatActivity() {
         c.addView(text(
             "最近互动：" + if (lastTs > 0L) formatTime(lastTs) else "暂无记录",
             11.5f, sub).apply { setPadding(0, dp(4), 0, 0) })
+        val edgeCount = store.relationsFor(c0.id).size
+        if (edgeCount > 0) {
+            c.addView(text("关系网：与 $edgeCount 个联系人建立了关系边", 11.5f, sub)
+                .apply { setPadding(0, dp(3), 0, 0) })
+        }
 
         if (c0.profileTags.isNotEmpty())
             c.addView(text("画像：" + c0.profileTags.joinToString("、").take(90), 12f, sub)
@@ -636,6 +648,127 @@ class KnowledgeActivity : AppCompatActivity() {
     companion object {
         const val EXTRA_LINK_APP = "link_app"
         const val EXTRA_LINK_TITLE = "link_title"
+    }
+
+    // --------------------------------------------------------- relationship graph
+
+    private fun renderRelations() {
+        val contacts = store.contacts().sortedBy { it.name.lowercase() }
+        val edges = store.contactRelations().sortedByDescending { it.updatedAt }
+
+        container.addView(twoButtons(
+            "新建关系",
+            {
+                if (contacts.size < 2) toast("至少需要两个联系人")
+                else editRelationDialog(null)
+            },
+            null,
+            null
+        ))
+
+        container.addView(card().apply {
+            addView(text("联系人关系网", 14f, ink, bold = true))
+            addView(text(
+                "这里记录“联系人和联系人之间”的关系，例如同学、同事、家人、通过谁认识。它和你本人对某个联系人的好感度是两套不同数据。",
+                11.5f, sub).apply { setPadding(0, dp(5), 0, 0) })
+        })
+
+        if (contacts.size < 2) {
+            container.addView(emptyCard("先建立至少两个联系人，才能创建关系边。"))
+            return
+        }
+        if (edges.isEmpty()) {
+            container.addView(emptyCard("还没有关系边。点击“新建关系”开始建立联系人之间的关系网络。"))
+            return
+        }
+
+        edges.forEach { edge ->
+            val from = contacts.firstOrNull { it.id == edge.fromId }?.name ?: "未知联系人"
+            val to = contacts.firstOrNull { it.id == edge.toId }?.name ?: "未知联系人"
+            container.addView(card().apply {
+                addView(text("${from}  ↔  ${to}", 15f, ink, bold = true))
+                addView(text(
+                    edge.type.ifBlank { "未命名关系" } + " · 强度 ${edge.strength}/100",
+                    12.5f, accent, bold = true).apply { setPadding(0, dp(5), 0, 0) })
+                addView(ProgressBar(this@KnowledgeActivity, null,
+                    android.R.attr.progressBarStyleHorizontal).apply {
+                    max = 100
+                    progress = edge.strength.coerceIn(0, 100)
+                    layoutParams = LinearLayout.LayoutParams(
+                        ViewGroup.LayoutParams.MATCH_PARENT, dp(6)).apply { topMargin = dp(5) }
+                })
+                if (edge.note.isNotBlank()) {
+                    addView(text(edge.note, 12f, sub).apply { setPadding(0, dp(6), 0, 0) })
+                }
+                val actions = LinearLayout(this@KnowledgeActivity).apply {
+                    orientation = LinearLayout.HORIZONTAL
+                    setPadding(0, dp(8), 0, 0)
+                }
+                actions.addView(miniAction("编辑") { editRelationDialog(edge) })
+                actions.addView(miniAction("删除", danger = true) {
+                    confirm("删除关系", "删除「${from} ↔ ${to}」这条关系边？") {
+                        store.deleteContactRelation(edge.id)
+                        render()
+                    }
+                })
+                addView(actions)
+            })
+        }
+    }
+
+    private fun editRelationDialog(existing: ContactRelation?) {
+        val contacts = store.contacts().sortedBy { it.name.lowercase() }
+        if (contacts.size < 2) { toast("至少需要两个联系人"); return }
+
+        val names = contacts.map { it.name.ifBlank { "未命名" } }
+        val box = dialogBox()
+        val fromSpinner = Spinner(this).apply {
+            adapter = ArrayAdapter(this@KnowledgeActivity,
+                android.R.layout.simple_spinner_dropdown_item, names)
+        }
+        val toSpinner = Spinner(this).apply {
+            adapter = ArrayAdapter(this@KnowledgeActivity,
+                android.R.layout.simple_spinner_dropdown_item, names)
+        }
+        existing?.let { relation ->
+            fromSpinner.setSelection(contacts.indexOfFirst { it.id == relation.fromId }.coerceAtLeast(0))
+            toSpinner.setSelection(contacts.indexOfFirst { it.id == relation.toId }.coerceAtLeast(0))
+        }
+
+        val typeEdit = edit(existing?.type ?: "", "例如：大学同学、同事、兄妹、通过某某认识")
+        val strengthEdit = scoreEdit(existing?.strength ?: 50)
+        val noteEdit = multiEdit(existing?.note ?: "", "可选：关系背景、认识渠道或需要记住的事项")
+
+        box.addView(label("联系人 A")); box.addView(fromSpinner)
+        box.addView(label("联系人 B")); box.addView(toSpinner)
+        box.addView(label("关系类型")); box.addView(typeEdit)
+        box.addView(label("关系强度（0–100）")); box.addView(strengthEdit)
+        box.addView(label("备注")); box.addView(noteEdit)
+
+        AlertDialog.Builder(this)
+            .setTitle(if (existing == null) "新建联系人关系" else "编辑联系人关系")
+            .setView(wrapScroll(box))
+            .setPositiveButton("保存") { _, _ ->
+                val from = contacts.getOrNull(fromSpinner.selectedItemPosition)
+                val to = contacts.getOrNull(toSpinner.selectedItemPosition)
+                if (from == null || to == null || from.id == to.id) {
+                    toast("请选择两个不同联系人")
+                    return@setPositiveButton
+                }
+                val ok = store.saveContactRelation(ContactRelation(
+                    id = existing?.id ?: KbStore.newId(),
+                    fromId = from.id,
+                    toId = to.id,
+                    type = typeEdit.text.toString().trim(),
+                    strength = readScore(strengthEdit),
+                    note = noteEdit.text.toString().trim(),
+                    updatedAt = existing?.updatedAt ?: System.currentTimeMillis()
+                ))
+                toast(if (ok) "关系已保存" else "关系保存失败")
+                render()
+            }
+            .setNegativeButton("取消", null)
+            .show()
     }
 
     // ----------------------------------------------------------------- atoms
