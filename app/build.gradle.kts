@@ -25,8 +25,8 @@ android {
         applicationId = "com.jev.probe"
         minSdk = 30
         targetSdk = 35
-        versionCode = 5
-        versionName = "1.4"
+        versionCode = 20
+        versionName = "2.0.0"
 
         // ML Kit's bundled Chinese recognizer ships native libs for every ABI.
         // The target phone (and every phone this can run on: minSdk 30) is
@@ -48,6 +48,11 @@ android {
     }
 
     buildTypes {
+        debug {
+            applicationIdSuffix = ".ultimate"
+            versionNameSuffix = "-ultimate"
+            resValue("string", "app_name", "Jev Ultimate")
+        }
         release {
             isMinifyEnabled = false
             signingConfig = signingConfigs.findByName("release")
