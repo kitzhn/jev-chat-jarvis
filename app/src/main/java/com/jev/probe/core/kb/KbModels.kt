@@ -31,12 +31,53 @@ data class Contact(
     val aliases: List<String> = emptyList(),
     /** Package names this contact has been seen in, e.g. com.tencent.mm. */
     val apps: List<String> = emptyList(),
+
+    /** User-defined relationship type, e.g. friend / colleague / family. */
     val relationship: String = "",
+    /** Optional current relationship state, e.g. newly acquainted / close / cooling down. */
+    val relationshipStage: String = "",
+
+    /**
+     * User-maintained affinity score. This is deliberately NOT inferred from chat:
+     * the owner decides what the number means and when it changes.
+     */
+    val affection: Int = 50,
+    /** User-maintained trust and closeness dimensions for a richer relationship model. */
+    val trust: Int = 50,
+    val closeness: Int = 50,
+
+    /** Structured profile fields. */
+    val profileTags: List<String> = emptyList(),
+    val traits: String = "",
+    val communicationStyle: String = "",
+    val boundaries: String = "",
+
     val notes: String = "",
-    /** Reserved for the (deferred) auto-summary; never written in v1.3. */
+    /** Reserved for the (deferred) auto-summary; never written automatically here. */
     val autoSummary: String = "",
     val updatedAt: Long = System.currentTimeMillis()
 )
+
+/** A neutral, game-like affinity scale that works for friends, family and colleagues too. */
+data class AffectionTier(val min: Int, val max: Int, val label: String)
+
+object AffectionScale {
+    val tiers: List<AffectionTier> = listOf(
+        AffectionTier(0, 19, "冷淡"),
+        AffectionTier(20, 39, "疏远"),
+        AffectionTier(40, 59, "普通"),
+        AffectionTier(60, 79, "亲近"),
+        AffectionTier(80, 94, "信赖"),
+        AffectionTier(95, 100, "特别亲密")
+    )
+
+    fun clamp(value: Int): Int = value.coerceIn(0, 100)
+
+    fun label(value: Int): String {
+        val v = clamp(value)
+        return tiers.firstOrNull { v in it.min..it.max }?.label ?: "普通"
+    }
+}
 
 /** One remembered chat line. side is "me" / "other", matching [com.jev.probe.core.Msg]. */
 data class LogEntry(val side: String, val text: String, val ts: Long, val app: String)
@@ -54,6 +95,11 @@ data class ChatContext(
     /** True when there is nothing extra to inject (then no field is sent at all). */
     fun isEmpty(): Boolean = history.isEmpty() && notes.isEmpty() &&
         (contact == null || (contact.relationship.isBlank() &&
+            contact.relationshipStage.isBlank() &&
+            contact.profileTags.isEmpty() &&
+            contact.traits.isBlank() &&
+            contact.communicationStyle.isBlank() &&
+            contact.boundaries.isBlank() &&
             contact.notes.isBlank() && contact.autoSummary.isBlank()))
 
     /**
@@ -72,6 +118,20 @@ data class ChatContext(
         contact?.let { c ->
             val rel = c.relationship.trim()
             if (rel.isNotEmpty()) sb.append("关系：").append(rel).append('\n')
+            if (c.relationshipStage.isNotBlank()) sb.append("关系阶段：")
+                .append(c.relationshipStage.trim()).append('\n')
+            sb.append("好感度：").append(AffectionScale.clamp(c.affection))
+                .append("/100（").append(AffectionScale.label(c.affection)).append("）").append('\n')
+            sb.append("信任度：").append(AffectionScale.clamp(c.trust)).append("/100").append('\n')
+            sb.append("亲密度：").append(AffectionScale.clamp(c.closeness)).append("/100").append('\n')
+            if (c.profileTags.isNotEmpty()) sb.append("画像标签：")
+                .append(c.profileTags.joinToString("、")).append('\n')
+            if (c.traits.isNotBlank()) sb.append("性格/特征：")
+                .append(c.traits.trim()).append('\n')
+            if (c.communicationStyle.isNotBlank()) sb.append("沟通偏好：")
+                .append(c.communicationStyle.trim()).append('\n')
+            if (c.boundaries.isNotBlank()) sb.append("边界/忌讳：")
+                .append(c.boundaries.trim()).append('\n')
             if (c.notes.isNotBlank()) sb.append("关于").append(c.name).append("：")
                 .append(c.notes.trim()).append('\n')
             if (c.autoSummary.isNotBlank()) sb.append("过往摘要：")
