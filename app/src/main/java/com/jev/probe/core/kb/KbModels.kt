@@ -20,17 +20,37 @@ data class Note(
     val updatedAt: Long = System.currentTimeMillis()
 )
 
+/** One app-specific identity that belongs to a real-world contact. */
+data class PlatformIdentity(
+    val app: String,
+    val title: String,
+    val label: String = ""
+)
+
+/** One manual affinity change event. */
+data class RelationshipEvent(
+    val id: String,
+    val ts: Long,
+    val delta: Int,
+    val fromScore: Int,
+    val toScore: Int,
+    val reason: String = "",
+    val source: String = "manual"
+)
+
 /**
- * One person (or group) the user chats with. [aliases] is what makes a contact
- * cross-app: the same person shows up as different conversation titles in
- * WeChat / QQ / Feishu, and each of those titles can be listed here.
+ * One person (or group) the user chats with. [identities] is the preferred
+ * cross-app mapping: each entry binds an app package + conversation title to
+ * this one real-world contact. [aliases]/[apps] remain for backward compatibility.
  */
 data class Contact(
     val id: String,
     val name: String,
     val aliases: List<String> = emptyList(),
-    /** Package names this contact has been seen in, e.g. com.tencent.mm. */
+    /** Package names this contact has been seen in, retained for old data. */
     val apps: List<String> = emptyList(),
+    /** Exact app-scoped identities for safe cross-app contact linking. */
+    val identities: List<PlatformIdentity> = emptyList(),
 
     /** User-defined relationship type, e.g. friend / colleague / family. */
     val relationship: String = "",
@@ -118,6 +138,16 @@ data class ChatContext(
                 .append("/100（").append(AffectionScale.label(c.affection)).append("）").append('\n')
             sb.append("信任度：").append(AffectionScale.clamp(c.trust)).append("/100").append('\n')
             sb.append("亲密度：").append(AffectionScale.clamp(c.closeness)).append("/100").append('\n')
+            if (c.identities.isNotEmpty()) sb.append("已关联平台身份：")
+                .append(c.identities.joinToString("；") { identity ->
+                    val appName = when (identity.app) {
+                        "com.tencent.mobileqq" -> "QQ"
+                        "com.ss.android.lark" -> "飞书"
+                        "com.twitter.android" -> "X"
+                        else -> identity.label.ifBlank { identity.app }
+                    }
+                    "${appName}:${identity.title}"
+                }).append('\n')
             if (c.profileTags.isNotEmpty()) sb.append("画像标签：")
                 .append(c.profileTags.joinToString("、")).append('\n')
             if (c.traits.isNotBlank()) sb.append("性格/特征：")
