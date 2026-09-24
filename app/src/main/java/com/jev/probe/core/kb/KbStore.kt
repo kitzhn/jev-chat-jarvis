@@ -73,11 +73,22 @@ class KbStore private constructor(context: Context) {
     fun saveContact(c: Contact): Boolean = synchronized(lock) {
         val list = loadContacts()
         val i = list.indexOfFirst { it.id == c.id }
-        val stamped = c.copy(updatedAt = System.currentTimeMillis())
+        val stamped = c.copy(
+            affection = AffectionScale.clamp(c.affection),
+            trust = AffectionScale.clamp(c.trust),
+            closeness = AffectionScale.clamp(c.closeness),
+            updatedAt = System.currentTimeMillis()
+        )
         if (i >= 0) list[i] = stamped else list.add(stamped)
         val ok = writeAtomic(contactsFile, contactsJson(list))
         if (!ok) contactsCache = null
         ok
+    }
+
+    fun adjustAffection(id: String, delta: Int): Contact? = synchronized(lock) {
+        val current = loadContacts().firstOrNull { it.id == id } ?: return@synchronized null
+        val next = current.copy(affection = AffectionScale.clamp(current.affection + delta))
+        return@synchronized if (saveContact(next)) contact(id) else null
     }
 
     /** Removes the contact and its history file. */
@@ -326,6 +337,14 @@ class KbStore private constructor(context: Context) {
                     aliases = strList(o.optJSONArray("aliases")),
                     apps = strList(o.optJSONArray("apps")),
                     relationship = o.optString("relationship"),
+                    relationshipStage = o.optString("relationshipStage"),
+                    affection = AffectionScale.clamp(o.optInt("affection", 50)),
+                    trust = AffectionScale.clamp(o.optInt("trust", 50)),
+                    closeness = AffectionScale.clamp(o.optInt("closeness", 50)),
+                    profileTags = strList(o.optJSONArray("profileTags")),
+                    traits = o.optString("traits"),
+                    communicationStyle = o.optString("communicationStyle"),
+                    boundaries = o.optString("boundaries"),
                     notes = o.optString("notes"),
                     autoSummary = o.optString("autoSummary"),
                     updatedAt = o.optLong("updatedAt", 0L)
@@ -379,6 +398,14 @@ class KbStore private constructor(context: Context) {
                 .put("aliases", JSONArray(c.aliases))
                 .put("apps", JSONArray(c.apps))
                 .put("relationship", c.relationship)
+                .put("relationshipStage", c.relationshipStage)
+                .put("affection", AffectionScale.clamp(c.affection))
+                .put("trust", AffectionScale.clamp(c.trust))
+                .put("closeness", AffectionScale.clamp(c.closeness))
+                .put("profileTags", JSONArray(c.profileTags))
+                .put("traits", c.traits)
+                .put("communicationStyle", c.communicationStyle)
+                .put("boundaries", c.boundaries)
                 .put("notes", c.notes)
                 .put("autoSummary", c.autoSummary)
                 .put("updatedAt", c.updatedAt))
