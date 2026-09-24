@@ -268,55 +268,106 @@ class KnowledgeActivity : AppCompatActivity() {
 
     private fun contactRow(c0: Contact): View {
         val c = card()
-        val titleRow = LinearLayout(this).apply {
+
+        val header = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
         }
-        titleRow.addView(text(c0.name.ifBlank { "（无名）" }, 15f, ink, bold = true).apply {
+        header.addView(avatarView(c0.name))
+        val headerText = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
             layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
-        })
-        titleRow.addView(text(
-            "${c0.affection}/100 · ${AffectionScale.label(c0.affection)}",
-            13f, accent, bold = true))
-        c.addView(titleRow)
-
+            setPadding(dp(10), 0, dp(8), 0)
+        }
+        headerText.addView(text(c0.name.ifBlank { "（无名）" }, 16f, ink, bold = true))
         val relationshipLine = listOf(c0.relationship, c0.relationshipStage)
             .map { it.trim() }.filter { it.isNotEmpty() }.joinToString(" · ")
-        if (relationshipLine.isNotEmpty())
-            c.addView(text("关系：" + relationshipLine.take(60), 12f, sub)
-                .apply { setPadding(0, dp(4), 0, 0) })
+        if (relationshipLine.isNotEmpty()) {
+            headerText.addView(text(relationshipLine.take(60), 11.5f, sub)
+                .apply { setPadding(0, dp(3), 0, 0) })
+        }
+        header.addView(headerText)
+        header.addView(stageBadge(c0))
+        c.addView(header)
 
+        c.addView(text(
+            "好感 ${c0.affection}/100 · ${AffectionScale.label(c0.affection)}",
+            13f, accent, bold = true).apply { setPadding(0, dp(10), 0, dp(4)) })
+        c.addView(ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal).apply {
+            max = 100
+            progress = AffectionScale.clamp(c0.affection)
+            layoutParams = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(7))
+        })
         c.addView(text("信任 ${c0.trust}/100  ·  亲密 ${c0.closeness}/100", 12f, sub)
-            .apply { setPadding(0, dp(3), 0, 0) })
+            .apply { setPadding(0, dp(5), 0, 0) })
+
+        if (c0.identities.isNotEmpty()) {
+            c.addView(text(
+                "平台：" + c0.identities.joinToString("  ·  ") {
+                    "${identityLabel(it.app)}: ${it.title}"
+                }.take(120),
+                12f, sub).apply { setPadding(0, dp(5), 0, 0) })
+        } else if (c0.apps.isNotEmpty()) {
+            c.addView(text("平台：" + c0.apps.joinToString("、") { appLabel(it) }, 12f, sub)
+                .apply { setPadding(0, dp(5), 0, 0) })
+        }
+
+        val lastTs = store.lastInteractionAt(c0.id)
+        c.addView(text(
+            "最近互动：" + if (lastTs > 0L) formatTime(lastTs) else "暂无记录",
+            11.5f, sub).apply { setPadding(0, dp(4), 0, 0) })
 
         if (c0.profileTags.isNotEmpty())
-            c.addView(text("画像：" + c0.profileTags.joinToString("、").take(70), 12f, sub)
-                .apply { setPadding(0, dp(3), 0, 0) })
+            c.addView(text("画像：" + c0.profileTags.joinToString("、").take(90), 12f, sub)
+                .apply { setPadding(0, dp(4), 0, 0) })
         if (c0.traits.isNotBlank())
-            c.addView(text("特征：" + c0.traits.replace("\n", " ").take(70), 12f, sub)
+            c.addView(text("特征：" + c0.traits.replace("\n", " ").take(90), 12f, sub)
                 .apply { setPadding(0, dp(3), 0, 0) })
         if (c0.communicationStyle.isNotBlank())
-            c.addView(text("沟通：" + c0.communicationStyle.replace("\n", " ").take(70), 12f, sub)
+            c.addView(text("沟通：" + c0.communicationStyle.replace("\n", " ").take(90), 12f, sub)
                 .apply { setPadding(0, dp(3), 0, 0) })
+
+        val recentEvents = store.relationshipEvents(c0.id, 2)
+        if (recentEvents.isNotEmpty()) {
+            c.addView(text("最近好感变化", 11.5f, ink, bold = true)
+                .apply { setPadding(0, dp(9), 0, dp(2)) })
+            recentEvents.asReversed().forEach { e ->
+                c.addView(text(eventLine(e), 11f, sub)
+                    .apply { setPadding(0, dp(2), 0, 0) })
+            }
+        }
+
+        if (pendingLinkTitle.isNotBlank()) {
+            c.addView(actionButton("关联当前会话到这个联系人") {
+                val msg = store.linkCurrentIdentityToContact(
+                    c0.id, pendingLinkApp, pendingLinkTitle)
+                toast(msg)
+                pendingLinkApp = ""
+                pendingLinkTitle = ""
+                render()
+            })
+        }
 
         c.addView(affectionAdjustRow(c0))
 
-        val logN = store.logSize(c0.id)
-        val clear = TextView(this).apply {
-            text = "清空此人历史（$logN 条）"
-            textSize = 12.5f; setTextColor(red); setTypeface(typeface, Typeface.BOLD)
-            setPadding(0, dp(10), 0, dp(2))
-            setOnClickListener {
-                if (logN == 0) { toast("本来就没有历史"); return@setOnClickListener }
-                confirm("清空历史", "删掉「${c0.name}」的 $logN 条聊天历史？联系人画像保留。") {
-                    store.clearLog(c0.id); render()
-                }
-            }
+        val tools = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            setPadding(0, dp(7), 0, 0)
         }
-        c.addView(clear)
+        tools.addView(miniAction("查看好感记录") { showRelationshipHistory(c0) })
+        val logN = store.logSize(c0.id)
+        tools.addView(miniAction("清空历史（$logN）", danger = true) {
+            if (logN == 0) { toast("本来就没有历史") }
+            else confirm("清空历史", "删掉「${c0.name}」的 $logN 条聊天历史？联系人画像保留。") {
+                store.clearLog(c0.id); render()
+            }
+        })
+        c.addView(tools)
+
         c.setOnClickListener { editContactDialog(c0) }
         c.setOnLongClickListener {
-            confirm("删除联系人", "删除「${c0.name}」及其全部历史？不可恢复。") {
+            confirm("删除联系人", "删除「${c0.name}」及其全部历史、关系记录？不可恢复。") {
                 store.deleteContact(c0.id); render()
             }
             true
@@ -328,7 +379,7 @@ class KnowledgeActivity : AppCompatActivity() {
         val row = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
-            setPadding(0, dp(8), 0, 0)
+            setPadding(0, dp(9), 0, 0)
         }
         row.addView(text("好感快捷调整", 11.5f, sub).apply {
             layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
@@ -345,27 +396,66 @@ class KnowledgeActivity : AppCompatActivity() {
                 layoutParams = LinearLayout.LayoutParams(
                     ViewGroup.LayoutParams.WRAP_CONTENT,
                     ViewGroup.LayoutParams.WRAP_CONTENT).apply { leftMargin = dp(8) }
-                setOnClickListener {
-                    store.adjustAffection(contact.id, delta)
-                    render()
-                }
+                setOnClickListener { showAffectionChangeDialog(contact, delta) }
             })
         }
         return row
     }
 
+    private fun showAffectionChangeDialog(contact: Contact, delta: Int) {
+        val box = dialogBox()
+        box.addView(text(
+            "好感 ${contact.affection} → ${AffectionScale.clamp(contact.affection + delta)}",
+            14f, ink, bold = true))
+        val reason = edit("", "可选：为什么这次变化？例如：一次愉快的见面")
+        box.addView(label("变化原因")); box.addView(reason)
+        AlertDialog.Builder(this)
+            .setTitle(if (delta > 0) "增加好感" else "降低好感")
+            .setView(box)
+            .setPositiveButton("保存") { _, _ ->
+                store.adjustAffection(contact.id, delta, reason.text.toString().trim(), "quick")
+                render()
+            }
+            .setNegativeButton("取消", null)
+            .show()
+    }
+
+    private fun showRelationshipHistory(contact: Contact) {
+        val events = store.relationshipEvents(contact.id, 50).asReversed()
+        val msg = if (events.isEmpty()) "还没有好感变化记录。"
+        else events.joinToString("\n\n") { eventLine(it) }
+        AlertDialog.Builder(this)
+            .setTitle("「${contact.name}」好感记录")
+            .setMessage(msg)
+            .setPositiveButton("关闭", null)
+            .show()
+    }
+
+    private fun eventLine(e: RelationshipEvent): String {
+        val sign = if (e.delta > 0) "+${e.delta}" else e.delta.toString()
+        val why = e.reason.ifBlank { "未填写原因" }
+        return "${formatTime(e.ts)}  $sign  ${e.fromScore}→${e.toScore} · $why"
+    }
+
     private fun editContactDialog(existing: Contact?) {
         val box = dialogBox()
         val nameEdit = edit(existing?.name ?: "", "联系人显示名称")
-        val aliasEdit = edit(existing?.aliases?.joinToString("\n") ?: "", "每行一个跨 App 别名").apply {
+        val aliasEdit = edit(existing?.aliases?.joinToString("\n") ?: "", "兼容旧数据：每行一个全局别名").apply {
             inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE
             minLines = 2; gravity = Gravity.TOP
         }
+        val identityEdit = multiEdit(
+            existing?.identities?.joinToString("\n") {
+                "${identityLabel(it.app)} | ${it.title}"
+            } ?: "",
+            "每行一个，例如：QQ | 昵称\n飞书 | 姓名\nX | @handle"
+        )
         val relEdit = edit(existing?.relationship ?: "", "关系类型")
         val stageEdit = edit(existing?.relationshipStage ?: "", "当前关系阶段")
         val affectionEdit = scoreEdit(existing?.affection ?: 50)
         val trustEdit = scoreEdit(existing?.trust ?: 50)
         val closenessEdit = scoreEdit(existing?.closeness ?: 50)
+        val affectionReasonEdit = edit("", "仅当好感分数变化时记录，例如：一起完成了一件重要的事")
         val tagsEdit = edit(existing?.profileTags?.joinToString("，") ?: "", "逗号分隔的画像标签")
         val traitsEdit = multiEdit(existing?.traits ?: "", "性格、长期特征或相处特点")
         val communicationEdit = multiEdit(existing?.communicationStyle ?: "", "适合的沟通方式、回复风格")
@@ -374,14 +464,19 @@ class KnowledgeActivity : AppCompatActivity() {
 
         box.addView(label("基本信息"))
         box.addView(label("名字")); box.addView(nameEdit)
-        box.addView(label("别名（每行一个）")); box.addView(aliasEdit)
+        box.addView(label("平台身份"))
+        box.addView(text(
+            "推荐使用“平台 | 会话标题”。同一个现实联系人可以绑定多个 App；匹配时优先使用这组精确身份。",
+            11f, sub))
+        box.addView(identityEdit)
+        box.addView(label("旧式全局别名")); box.addView(aliasEdit)
         box.addView(label("关系类型")); box.addView(relEdit)
         box.addView(label("关系阶段")); box.addView(stageEdit)
 
         box.addView(label("关系量表（0–100）"))
-        box.addView(text("好感度对应上方量级表；信任与亲密作为独立维度。所有分数均由用户手动维护。",
-            11f, sub))
+        box.addView(text("好感、信任、亲密均由用户维护，不自动推断对方心理。", 11f, sub))
         box.addView(label("好感度")); box.addView(affectionEdit)
+        box.addView(label("本次好感变化原因")); box.addView(affectionReasonEdit)
         box.addView(label("信任度")); box.addView(trustEdit)
         box.addView(label("亲密度")); box.addView(closenessEdit)
 
@@ -398,12 +493,15 @@ class KnowledgeActivity : AppCompatActivity() {
             .setPositiveButton("保存") { _, _ ->
                 val name = nameEdit.text.toString().trim()
                 if (name.isBlank()) { toast("名字不能空"); return@setPositiveButton }
-                store.saveContact(Contact(
+                val identities = parseIdentityLines(identityEdit.text.toString())
+                val updated = Contact(
                     id = existing?.id ?: KbStore.newId(),
                     name = name,
                     aliases = aliasEdit.text.toString().split("\n")
                         .map { it.trim() }.filter { it.isNotEmpty() },
-                    apps = existing?.apps ?: emptyList(),
+                    apps = ((existing?.apps ?: emptyList()) + identities.map { it.app })
+                        .filter { it.isNotBlank() }.distinct(),
+                    identities = identities,
                     relationship = relEdit.text.toString().trim(),
                     relationshipStage = stageEdit.text.toString().trim(),
                     affection = readScore(affectionEdit),
@@ -415,12 +513,34 @@ class KnowledgeActivity : AppCompatActivity() {
                     boundaries = boundariesEdit.text.toString().trim(),
                     notes = notesEdit.text.toString().trim(),
                     autoSummary = existing?.autoSummary ?: ""
-                ))
+                )
+                if (existing == null) store.saveContact(updated)
+                else store.saveContactWithAffectionEvent(
+                    updated, affectionReasonEdit.text.toString().trim().ifBlank { "画像编辑" })
                 render()
             }
             .setNegativeButton("取消", null)
             .show()
     }
+
+    private fun parseIdentityLines(raw: String): List<PlatformIdentity> =
+        raw.split("\n").mapNotNull { line ->
+            val t = line.trim()
+            if (t.isEmpty()) return@mapNotNull null
+            val separators = listOf(" | ", "｜", "|", "：", ":")
+            val sep = separators.firstOrNull { t.contains(it) }
+            if (sep == null) {
+                PlatformIdentity("", t, "")
+            } else {
+                val left = t.substringBefore(sep).trim()
+                val right = t.substringAfter(sep).trim()
+                if (right.isEmpty()) null else PlatformIdentity(
+                    app = appPackageForLabel(left),
+                    title = right,
+                    label = left
+                )
+            }
+        }.distinctBy { it.app + "\u0000" + KbStore.normalizeName(it.title) }
 
     private fun scoreEdit(value: Int): EditText = edit(
         AffectionScale.clamp(value).toString(), "0–100"
@@ -438,11 +558,84 @@ class KnowledgeActivity : AppCompatActivity() {
             gravity = Gravity.TOP
         }
 
+    private fun appPackageForLabel(label: String): String = when (label.trim().lowercase()) {
+        "qq" -> "com.tencent.mobileqq"
+        "飞书", "lark" -> "com.ss.android.lark"
+        "x", "twitter" -> "com.twitter.android"
+        "微信", "wechat" -> "com.tencent.mm"
+        "telegram", "tg" -> "org.telegram.messenger"
+        "钉钉", "dingtalk" -> "com.alibaba.android.rimet"
+        else -> label.trim()
+    }
+
+    private fun identityLabel(pkg: String): String = appLabel(pkg).ifBlank { "其它" }
+
     private fun appLabel(pkg: String): String = when (pkg) {
         "com.tencent.mobileqq" -> "QQ"
         "com.ss.android.lark" -> "飞书"
         "com.twitter.android" -> "X"
+        "com.tencent.mm" -> "微信"
+        "org.telegram.messenger" -> "Telegram"
+        "com.alibaba.android.rimet" -> "钉钉"
+        "" -> "未知 App"
         else -> pkg
+    }
+
+    private fun formatTime(ts: Long): String =
+        SimpleDateFormat("MM-dd HH:mm", Locale.getDefault()).format(Date(ts))
+
+    private fun avatarView(name: String): TextView = TextView(this).apply {
+        text = name.trim().take(1).ifBlank { "?" }
+        textSize = 18f
+        gravity = Gravity.CENTER
+        setTypeface(typeface, Typeface.BOLD)
+        setTextColor(Color.WHITE)
+        background = GradientDrawable().apply {
+            shape = GradientDrawable.OVAL
+            setColor(accent)
+        }
+        layoutParams = LinearLayout.LayoutParams(dp(44), dp(44))
+    }
+
+    private fun stageBadge(contact: Contact): TextView = TextView(this).apply {
+        text = contact.relationshipStage.ifBlank { AffectionScale.label(contact.affection) }
+        textSize = 11f
+        setTypeface(typeface, Typeface.BOLD)
+        setTextColor(accent)
+        background = round(dp(12), Color.parseColor("#EEF4FF"))
+        setPadding(dp(9), dp(5), dp(9), dp(5))
+    }
+
+    private fun actionButton(labelText: String, onClick: () -> Unit): View =
+        TextView(this).apply {
+            text = labelText
+            textSize = 13f
+            gravity = Gravity.CENTER
+            setTypeface(typeface, Typeface.BOLD)
+            setTextColor(Color.WHITE)
+            background = round(dp(10), accent)
+            setPadding(dp(12), dp(9), dp(12), dp(9))
+            layoutParams = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT).apply { topMargin = dp(9) }
+            setOnClickListener { onClick() }
+        }
+
+    private fun miniAction(labelText: String, danger: Boolean = false, onClick: () -> Unit): View =
+        TextView(this).apply {
+            text = labelText
+            textSize = 11.5f
+            gravity = Gravity.CENTER
+            setTextColor(if (danger) red else accent)
+            setPadding(dp(8), dp(6), dp(8), dp(6))
+            layoutParams = LinearLayout.LayoutParams(
+                0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).apply { rightMargin = dp(6) }
+            setOnClickListener { onClick() }
+        }
+
+    companion object {
+        const val EXTRA_LINK_APP = "link_app"
+        const val EXTRA_LINK_TITLE = "link_title"
     }
 
     // ----------------------------------------------------------------- atoms
