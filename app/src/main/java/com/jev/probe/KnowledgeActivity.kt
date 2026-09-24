@@ -16,6 +16,7 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
+import com.jev.probe.core.kb.AffectionScale
 import com.jev.probe.core.kb.Contact
 import com.jev.probe.core.kb.KbStore
 import com.jev.probe.core.kb.Note
@@ -221,31 +222,62 @@ class KnowledgeActivity : AppCompatActivity() {
     private fun renderContacts() {
         val contacts = store.contacts().sortedByDescending { it.updatedAt }
         container.addView(twoButtons("新建联系人", { editContactDialog(null) }, null, null))
+        container.addView(affectionLegend())
         if (contacts.isEmpty()) {
             container.addView(emptyCard(
-                "还没有联系人。也可以在聊天里长按悬浮球，选「把当前会话存为联系人」。"))
+                "还没有联系人。可以新建联系人，或在聊天里长按悬浮球保存当前会话。"))
             return
         }
         contacts.forEach { container.addView(contactRow(it)) }
-        container.addView(text("点条目编辑，长按删除。会话标题等于名字或任一别名即算命中（忽略大小写与群人数后缀）。",
+        container.addView(text(
+            "好感度由用户手动维护，不会根据聊天内容自动升降。点卡片编辑完整画像，±5 可快速调整；长按删除。",
             11f, sub).apply { setPadding(dp(2), dp(12), 0, 0) })
+    }
+
+    private fun affectionLegend(): View = card().apply {
+        addView(text("好感度量级", 14f, ink, bold = true))
+        addView(text(
+            AffectionScale.tiers.joinToString("  ·  ") { "${it.min}-${it.max} ${it.label}" },
+            11.5f, sub).apply { setPadding(0, dp(6), 0, 0) })
+        addView(text(
+            "这是用户自定义的关系记录工具，不会自动推断对方真实感受。",
+            11f, sub).apply { setPadding(0, dp(5), 0, 0) })
     }
 
     private fun contactRow(c0: Contact): View {
         val c = card()
-        c.addView(text(c0.name.ifBlank { "（无名）" }, 15f, ink, bold = true))
-        if (c0.aliases.isNotEmpty())
-            c.addView(text("别名：" + c0.aliases.joinToString("、"), 12f, sub)
+        val titleRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
+        titleRow.addView(text(c0.name.ifBlank { "（无名）" }, 15f, ink, bold = true).apply {
+            layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
+        })
+        titleRow.addView(text(
+            "${c0.affection}/100 · ${AffectionScale.label(c0.affection)}",
+            13f, accent, bold = true))
+        c.addView(titleRow)
+
+        val relationshipLine = listOf(c0.relationship, c0.relationshipStage)
+            .map { it.trim() }.filter { it.isNotEmpty() }.joinToString(" · ")
+        if (relationshipLine.isNotEmpty())
+            c.addView(text("关系：" + relationshipLine.take(60), 12f, sub)
+                .apply { setPadding(0, dp(4), 0, 0) })
+
+        c.addView(text("信任 ${c0.trust}/100  ·  亲密 ${c0.closeness}/100", 12f, sub)
+            .apply { setPadding(0, dp(3), 0, 0) })
+
+        if (c0.profileTags.isNotEmpty())
+            c.addView(text("画像：" + c0.profileTags.joinToString("、").take(70), 12f, sub)
                 .apply { setPadding(0, dp(3), 0, 0) })
-        if (c0.apps.isNotEmpty())
-            c.addView(text("来源：" + c0.apps.joinToString("、") { appLabel(it) }, 12f, sub)
+        if (c0.traits.isNotBlank())
+            c.addView(text("特征：" + c0.traits.replace("\n", " ").take(70), 12f, sub)
                 .apply { setPadding(0, dp(3), 0, 0) })
-        if (c0.relationship.isNotBlank())
-            c.addView(text("关系：" + c0.relationship.replace("\n", " ").take(40), 12f, sub)
+        if (c0.communicationStyle.isNotBlank())
+            c.addView(text("沟通：" + c0.communicationStyle.replace("\n", " ").take(70), 12f, sub)
                 .apply { setPadding(0, dp(3), 0, 0) })
-        if (c0.notes.isNotBlank())
-            c.addView(text("备注：" + c0.notes.replace("\n", " ").take(40), 12f, sub)
-                .apply { setPadding(0, dp(3), 0, 0) })
+
+        c.addView(affectionAdjustRow(c0))
 
         val logN = store.logSize(c0.id)
         val clear = TextView(this).apply {
@@ -254,7 +286,7 @@ class KnowledgeActivity : AppCompatActivity() {
             setPadding(0, dp(10), 0, dp(2))
             setOnClickListener {
                 if (logN == 0) { toast("本来就没有历史"); return@setOnClickListener }
-                confirm("清空历史", "删掉「${c0.name}」的 $logN 条聊天历史？联系人档案保留。") {
+                confirm("清空历史", "删掉「${c0.name}」的 $logN 条聊天历史？联系人画像保留。") {
                     store.clearLog(c0.id); render()
                 }
             }
@@ -270,25 +302,76 @@ class KnowledgeActivity : AppCompatActivity() {
         return c
     }
 
+    private fun affectionAdjustRow(contact: Contact): View {
+        val row = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(0, dp(8), 0, 0)
+        }
+        row.addView(text("好感快捷调整", 11.5f, sub).apply {
+            layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
+        })
+        listOf(-5, 5).forEach { delta ->
+            row.addView(TextView(this).apply {
+                text = if (delta > 0) "+$delta" else "$delta"
+                textSize = 12.5f
+                gravity = Gravity.CENTER
+                setTypeface(typeface, Typeface.BOLD)
+                setTextColor(accent)
+                background = round(dp(9), Color.WHITE, stroke = true)
+                setPadding(dp(12), dp(6), dp(12), dp(6))
+                layoutParams = LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.WRAP_CONTENT,
+                    ViewGroup.LayoutParams.WRAP_CONTENT).apply { leftMargin = dp(8) }
+                setOnClickListener {
+                    store.adjustAffection(contact.id, delta)
+                    render()
+                }
+            })
+        }
+        return row
+    }
+
     private fun editContactDialog(existing: Contact?) {
         val box = dialogBox()
-        val nameEdit = edit(existing?.name ?: "", "名字，一般就是会话标题")
-        val aliasEdit = edit(existing?.aliases?.joinToString("\n") ?: "", "每行一个，例如另一个 App 里的昵称").apply {
+        val nameEdit = edit(existing?.name ?: "", "联系人显示名称")
+        val aliasEdit = edit(existing?.aliases?.joinToString("\n") ?: "", "每行一个跨 App 别名").apply {
             inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE
-            minLines = 3; gravity = Gravity.TOP
+            minLines = 2; gravity = Gravity.TOP
         }
-        val relEdit = edit(existing?.relationship ?: "", "例如：同事，带我做项目的组长")
-        val notesEdit = edit(existing?.notes ?: "", "关于这个人要记住的事").apply {
-            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE
-            minLines = 3; gravity = Gravity.TOP
-        }
+        val relEdit = edit(existing?.relationship ?: "", "关系类型")
+        val stageEdit = edit(existing?.relationshipStage ?: "", "当前关系阶段")
+        val affectionEdit = scoreEdit(existing?.affection ?: 50)
+        val trustEdit = scoreEdit(existing?.trust ?: 50)
+        val closenessEdit = scoreEdit(existing?.closeness ?: 50)
+        val tagsEdit = edit(existing?.profileTags?.joinToString("，") ?: "", "逗号分隔的画像标签")
+        val traitsEdit = multiEdit(existing?.traits ?: "", "性格、长期特征或相处特点")
+        val communicationEdit = multiEdit(existing?.communicationStyle ?: "", "适合的沟通方式、回复风格")
+        val boundariesEdit = multiEdit(existing?.boundaries ?: "", "边界、忌讳、敏感事项")
+        val notesEdit = multiEdit(existing?.notes ?: "", "其它需要记住的事实")
+
+        box.addView(label("基本信息"))
         box.addView(label("名字")); box.addView(nameEdit)
         box.addView(label("别名（每行一个）")); box.addView(aliasEdit)
-        box.addView(label("关系")); box.addView(relEdit)
+        box.addView(label("关系类型")); box.addView(relEdit)
+        box.addView(label("关系阶段")); box.addView(stageEdit)
+
+        box.addView(label("关系量表（0–100）"))
+        box.addView(text("好感度对应上方量级表；信任与亲密作为独立维度。所有分数均由用户手动维护。",
+            11f, sub))
+        box.addView(label("好感度")); box.addView(affectionEdit)
+        box.addView(label("信任度")); box.addView(trustEdit)
+        box.addView(label("亲密度")); box.addView(closenessEdit)
+
+        box.addView(label("联系人画像"))
+        box.addView(label("画像标签")); box.addView(tagsEdit)
+        box.addView(label("性格 / 特征")); box.addView(traitsEdit)
+        box.addView(label("沟通偏好")); box.addView(communicationEdit)
+        box.addView(label("边界 / 忌讳")); box.addView(boundariesEdit)
         box.addView(label("备注")); box.addView(notesEdit)
 
         AlertDialog.Builder(this)
-            .setTitle(if (existing == null) "新建联系人" else "编辑联系人")
+            .setTitle(if (existing == null) "新建联系人画像" else "编辑联系人画像")
             .setView(wrapScroll(box))
             .setPositiveButton("保存") { _, _ ->
                 val name = nameEdit.text.toString().trim()
@@ -300,6 +383,14 @@ class KnowledgeActivity : AppCompatActivity() {
                         .map { it.trim() }.filter { it.isNotEmpty() },
                     apps = existing?.apps ?: emptyList(),
                     relationship = relEdit.text.toString().trim(),
+                    relationshipStage = stageEdit.text.toString().trim(),
+                    affection = readScore(affectionEdit),
+                    trust = readScore(trustEdit),
+                    closeness = readScore(closenessEdit),
+                    profileTags = splitTags(tagsEdit.text.toString()),
+                    traits = traitsEdit.text.toString().trim(),
+                    communicationStyle = communicationEdit.text.toString().trim(),
+                    boundaries = boundariesEdit.text.toString().trim(),
                     notes = notesEdit.text.toString().trim(),
                     autoSummary = existing?.autoSummary ?: ""
                 ))
@@ -308,6 +399,22 @@ class KnowledgeActivity : AppCompatActivity() {
             .setNegativeButton("取消", null)
             .show()
     }
+
+    private fun scoreEdit(value: Int): EditText = edit(
+        AffectionScale.clamp(value).toString(), "0–100"
+    ).apply {
+        inputType = InputType.TYPE_CLASS_NUMBER
+    }
+
+    private fun readScore(v: EditText): Int =
+        AffectionScale.clamp(v.text.toString().toIntOrNull() ?: 50)
+
+    private fun multiEdit(value: String, hintText: String): EditText =
+        edit(value, hintText).apply {
+            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE
+            minLines = 3
+            gravity = Gravity.TOP
+        }
 
     private fun appLabel(pkg: String): String = when (pkg) {
         "com.tencent.mobileqq" -> "QQ"
