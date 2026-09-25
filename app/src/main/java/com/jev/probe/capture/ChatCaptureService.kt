@@ -62,6 +62,15 @@ open class ChatCaptureService : AccessibilityService() {
     private var lastSignature: String = ""
     private var activePkg: String? = null
     private var analyzing = false
+    /** Monotonic token for async analysis. Any conversation/window transition
+     * invalidates older network callbacks before they can touch the overlay. */
+    private var analysisGeneration: Long = 0L
+
+    private fun invalidateAnalysis() {
+        analysisGeneration++
+        analyzing = false
+        main.removeCallbacks(debounce)
+    }
 
     /** Last known-good (non-transient) title per package. See [isTransientTitle]:
      *  a page like X's DM thread briefly shows "连接中…" as `snapshot.title`
@@ -198,6 +207,7 @@ open class ChatCaptureService : AccessibilityService() {
             }
             if (fg != null && fg !in adapters) {
                 foregroundPkg = fg
+                invalidateAnalysis()
                 val drop = fg == packageName ||
                     fg.contains("launcher", ignoreCase = true) ||
                     fg == "com.miui.home" ||
@@ -284,8 +294,9 @@ open class ChatCaptureService : AccessibilityService() {
         // back) → just put the bubble back, do NOT re-analyze (saves tokens/time).
         if (sig == lastSignature && !showing) { main.post { overlay?.showIdle(snapshot.title) }; return }
         // Anything else reaching here is a genuinely different conversation (new
-        // app, or new content in this one) — a leftover judgment/candidates from
-        // whatever was shown before must not leak into it.
+        // app, or new content in this one). Invalidate in-flight callbacks first,
+        // then clear the visible state so an old result cannot repaint it.
+        invalidateAnalysis()
         main.post { overlay?.resetForNewConversation() }
         lastSignature = sig
         Log.d(TAG, "snapshot[$pkg] titlePresent=${!snapshot.title.isNullOrBlank()} n=${snapshot.messages.size} " +
@@ -316,6 +327,7 @@ open class ChatCaptureService : AccessibilityService() {
             lastOcrSignature = ""
             currentSnapshot = null
             pendingSnapshot = null
+            invalidateAnalysis()
             main.post { overlay?.resetForNewConversation() }
         }
         if (!prefs.wechatAutoOcr) {
@@ -403,37 +415,44 @@ open class ChatCaptureService : AccessibilityService() {
         return snapshot
     }
 
-    // REVIEW(MAJOR-01): async judgment/reply callbacks are not generation-scoped.
-    // See docs/CODE_REVIEW_2026-09-25.md. Do not change without owner approval.
     private fun runAnalysis() {
         val snapshot = pendingSnapshot ?: return
         if (analyzing) return
         if (!prefs.hasKey()) { main.post { overlay?.showError("未设置判断接口密钥，去设置里填") }; return }
+
+        val generation = ++analysisGeneration
         analyzing = true
-        main.post { overlay?.showLoading(); overlay?.setNote(snapshot.note) }
+        main.post {
+            if (generation != analysisGeneration) return@post
+            overlay?.showLoading()
+            overlay?.setNote(snapshot.note)
+        }
         val client = JevClient(prefs)
         val rel = prefs.relationship
         val pkg = activePkg ?: ""
         // Knowledge context first (local file reads only, a few ms), then the two
-        // network calls in parallel on the pool. A failure here must never stop
-        // the analysis — it just means no extra context this round.
+        // network calls in parallel on the pool. Every delivery checks the same
+        // generation token; stale results are discarded after a chat/window change.
         submit {
             val ctx = try {
                 ContextBuilder.build(this, snapshot, pkg, prefs)
             } catch (e: Exception) {
                 Log.w(TAG, "context build failed: ${e.javaClass.simpleName}"); null
             }
-            main.post { overlay?.setContextInfo(ctx?.notes?.size ?: 0, ctx?.history?.size ?: 0) }
+            main.post {
+                if (generation != analysisGeneration) return@post
+                overlay?.setContextInfo(ctx?.notes?.size ?: 0, ctx?.history?.size ?: 0)
+            }
 
-            // Judgment is fast (~1s) — show it immediately.
             submit {
                 val judgment = client.judge(snapshot, rel, ctx)
                 main.post {
-                    if (judgment.error != null) { analyzing = false; overlay?.showError(judgment.error) }
+                    if (generation != analysisGeneration) return@post
+                    if (judgment.error != null) overlay?.showError(judgment.error)
                     else overlay?.showJudgment(judgment)
                 }
             }
-            // Candidate replies are slower (generative + rank) — fill in when ready.
+
             submit {
                 var replyError: String? = null
                 val ranked = try { client.draftAndRank(snapshot, rel, ctx) } catch (e: Exception) {
@@ -441,8 +460,10 @@ open class ChatCaptureService : AccessibilityService() {
                     emptyList()
                 }
                 main.post {
+                    if (generation != analysisGeneration) return@post
                     analyzing = false
                     overlay?.showReplies(ranked, replyError) { chosen ->
+                        if (generation != analysisGeneration) return@showReplies
                         if (prefs.strategyLearningEnabled) {
                             ctx?.contact?.let { contact ->
                                 submit {
@@ -659,7 +680,8 @@ open class ChatCaptureService : AccessibilityService() {
             return
         }
         // Same rule as the tree path: past this point the conversation is either
-        // new or being force-refreshed, so drop whatever was shown before.
+        // new or being force-refreshed. Cancel older async deliveries before reset.
+        invalidateAnalysis()
         overlay?.resetForNewConversation()
         lastSignature = sig
 
@@ -772,6 +794,7 @@ open class ChatCaptureService : AccessibilityService() {
         overlay?.onLinkSpeaker = null
         overlay?.onOcrCapture = null
         WeChatNotificationBridge.setListener(null)
+        invalidateAnalysis()
         main.removeCallbacks(debounce)
         main.removeCallbacks(wechatAutoOcr)
         overlay?.hide()
