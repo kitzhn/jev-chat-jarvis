@@ -2,6 +2,8 @@ package com.jev.probe.jev
 
 import com.jev.probe.core.ChatSnapshot
 import com.jev.probe.core.Prefs
+import com.jev.probe.core.ReplyDraft
+import com.jev.probe.core.ReplyStrategy
 import com.jev.probe.core.kb.ChatContext
 import org.json.JSONArray
 import org.json.JSONObject
@@ -20,7 +22,7 @@ class ReplyClient(private val prefs: Prefs) {
      *        history are prepended to the prompt with an instruction to stay
      *        consistent with them and invent nothing beyond them.
      */
-    fun draft(snapshot: ChatSnapshot, relationship: String, ctx: ChatContext? = null): List<String> {
+    fun draft(snapshot: ChatSnapshot, relationship: String, ctx: ChatContext? = null): List<ReplyDraft> {
         val convo = snapshot.messages.takeLast(10).joinToString("\n") {
             (if (it.side == "me") "我" else "对方") + "：" + it.text
         }
@@ -29,7 +31,17 @@ class ReplyClient(private val prefs: Prefs) {
             "每条不超过 40 字，口语、自然、像真人在聊天软件里发消息。四条不要只是同义改写。不要解释，直接输出 JSON 数组。"
         val user = knowledgeBlock(relationship, ctx) +
             "关系：$relationship\n\n最近对话：\n$convo\n\n请给出 4 条不同策略的候选回复。"
-        return parseFour(chat(sys, user, temperature = 0.85))
+        return parseFour(chat(sys, user, temperature = 0.85)).mapIndexed { index, text ->
+            ReplyDraft(
+                text = text,
+                strategy = listOf(
+                    ReplyStrategy.WARM,
+                    ReplyStrategy.PLAYFUL,
+                    ReplyStrategy.STEADY,
+                    ReplyStrategy.PROACTIVE
+                ).getOrElse(index) { ReplyStrategy.UNKNOWN }
+            )
+        }
     }
 
     /** The background + history preamble; empty string when there is no context. */
