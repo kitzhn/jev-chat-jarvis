@@ -6,6 +6,11 @@ on:
       - main
     paths:
       - ".github/workflows/ui-emulator.yml"
+      - ".github/scripts/capture-ui.sh"
+      - "app/src/main/java/com/jev/probe/KnowledgeActivity.kt"
+      - "app/src/main/java/com/jev/probe/ui/RelationshipGraphView.kt"
+      - "app/src/main/java/com/jev/probe/overlay/OverlayController.kt"
+      - "app/src/debug/**"
   workflow_dispatch:
 
 jobs:
