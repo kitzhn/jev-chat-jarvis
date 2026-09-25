@@ -441,13 +441,15 @@ open class ChatCaptureService : AccessibilityService() {
                 main.post {
                     analyzing = false
                     overlay?.showReplies(ranked, replyError) { chosen ->
-                        ctx?.contact?.let { contact ->
-                            submit {
-                                runCatching {
-                                    KbStore.get(this).recordStrategySelection(
-                                        contact.id,
-                                        chosen.strategy.name.lowercase()
-                                    )
+                        if (prefs.strategyLearningEnabled) {
+                            ctx?.contact?.let { contact ->
+                                submit {
+                                    runCatching {
+                                        KbStore.get(this).recordStrategySelection(
+                                            contact.id,
+                                            chosen.strategy.name.lowercase()
+                                        )
+                                    }
                                 }
                             }
                         }
