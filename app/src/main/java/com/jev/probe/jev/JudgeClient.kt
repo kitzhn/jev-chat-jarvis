@@ -6,6 +6,7 @@ import com.jev.probe.core.ChatSnapshot
 import com.jev.probe.core.Choice
 import com.jev.probe.core.Prefs
 import com.jev.probe.core.RankedReply
+import com.jev.probe.core.ReplyDraft
 import com.jev.probe.core.Score
 import com.jev.probe.core.kb.ChatContext
 import org.json.JSONObject
@@ -52,11 +53,11 @@ class JudgeClient(private val prefs: Prefs) {
     fun rank(
         snapshot: ChatSnapshot,
         relationship: String,
-        candidates: List<String>,
+        candidates: List<ReplyDraft>,
         ctx: ChatContext? = null
     ): List<RankedReply> {
         val questions = JSONObject().put("best_reply",
-            JevQuestions.rankQuestion(candidates).getJSONObject("best_reply"))
+            JevQuestions.rankQuestion(candidates.map { it.text }).getJSONObject("best_reply"))
         val answers = postDecisions(snapshot, relationship, ctx, questions)
         return parseRanked(answers.optJSONObject("best_reply"), candidates)
     }
@@ -115,11 +116,18 @@ class JudgeClient(private val prefs: Prefs) {
         return Score(o.optDouble("score", 0.0), o.optDouble("confidence", 0.0), maxLevel)
     }
 
-    private fun parseRanked(o: JSONObject?, candidates: List<String>): List<RankedReply> {
+    private fun parseRanked(o: JSONObject?, candidates: List<ReplyDraft>): List<RankedReply> {
         val keys = listOf("reply_a", "reply_b", "reply_c", "reply_d")
         val probs = o?.optJSONObject("probabilities")
-        val list = candidates.mapIndexed { i, text ->
-            RankedReply(text, probs?.optDouble(keys.getOrElse(i) { "" }, 0.0) ?: 0.0)
+        val list = candidates.mapIndexed { i, draft ->
+            val p = probs?.optDouble(keys.getOrElse(i) { "" }, 0.0) ?: 0.0
+            RankedReply(
+                text = draft.text,
+                prob = p,
+                strategy = draft.strategy,
+                judgeProb = p,
+                relationWeight = 1.0
+            )
         }
         return list.sortedByDescending { it.prob }
     }
