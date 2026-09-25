@@ -222,6 +222,14 @@ class SettingsActivity : AppCompatActivity() {
         replyCard.addView(edit(prefs.replyKey, "留空则用判断接口密钥", password = true).also { replyKeyEdit = it })
         replyCard.addView(label("模型"))
         replyCard.addView(replyModelEdit)
+        val deepSeekThinkingRow = toggleRow(
+            "DeepSeek 官方：启用 thinking（高级）",
+            prefs.deepSeekThinkingEnabled
+        )
+        replyCard.addView(deepSeekThinkingRow)
+        replyCard.addView(text(
+            "默认关闭，仅对 api.deepseek.com 的 deepseek-flash 生效。回复和视觉/OCR 都会使用该开关；开启后会增加 reasoning token/延迟，且 temperature 不再生效。",
+            11f, sub))
         val replyResult = resultText()
         replyCard.addView(cardBtn("测试回复") {
             val base = replyBaseEdit.text.toString().trim()
@@ -231,6 +239,7 @@ class SettingsActivity : AppCompatActivity() {
                 replyBaseUrl = base.ifBlank { Prefs.DEFAULT_REPLY_BASE }
                 replyKey = replyKeyEdit.text.toString().trim()
                 replyModel = model.ifBlank { Prefs.DEFAULT_REPLY_MODEL }
+                deepSeekThinkingEnabled = (deepSeekThinkingRow.tag as? Boolean) ?: false
             }
             if (probe.effectiveReplyKey().isBlank()) { replyResult.text = "请先填密钥（或填判断接口密钥）"; return@cardBtn }
             replyResult.text = "测试中…"
@@ -287,6 +296,7 @@ class SettingsActivity : AppCompatActivity() {
                 visionBaseUrl = visionBase
                 visionKey = visionKeyEdit.text.toString().trim()
                 visionModel = visionModelEdit.text.toString().trim().ifBlank { Prefs.DEFAULT_VISION_MODEL }
+                deepSeekThinkingEnabled = (deepSeekThinkingRow.tag as? Boolean) ?: false
             }
             if (probe.effectiveVisionKey().isBlank()) { visionResult.text = "请先填密钥（或填回复/判断接口密钥）"; return@cardBtn }
             visionResult.text = "测试中…"
@@ -331,7 +341,7 @@ class SettingsActivity : AppCompatActivity() {
             prefs.visionBaseUrl = Prefs.DEEPSEEK_BASE
             prefs.visionModel = Prefs.DEEPSEEK_MODEL
             prefs.visionKey = ""
-            Toast.makeText(this, "已切换到 deepseek-flash；填写一个 DeepSeek Key 即可。", Toast.LENGTH_LONG).show()
+            Toast.makeText(this, "已切换到 deepseek-flash；填写一个 DeepSeek Key 即可。thinking 默认关闭，可在回复接口高级开关中启用。", Toast.LENGTH_LONG).show()
             recreate()
         })
         apiQuickCard.addView(cardBtn("复制 API 配置模板（不含密钥）") {
@@ -510,6 +520,7 @@ class SettingsActivity : AppCompatActivity() {
             prefs.visionBaseUrl = visionBaseEdit.text.toString().trim()
             prefs.visionKey = visionKeyEdit.text.toString()
             prefs.visionModel = visionModelEdit.text.toString().trim().ifBlank { Prefs.DEFAULT_VISION_MODEL }
+            prefs.deepSeekThinkingEnabled = (deepSeekThinkingRow.tag as? Boolean) ?: false
 
             prefs.relationship = relEdit.text.toString()   // blank stays blank, on purpose
             prefs.whitelist = wlEdit.text.toString().split("\n")
@@ -596,6 +607,7 @@ class SettingsActivity : AppCompatActivity() {
         .put("replyModel", prefs.replyModel)
         .put("visionBaseUrl", prefs.visionBaseUrl)
         .put("visionModel", prefs.visionModel)
+        .put("deepSeekThinkingEnabled", prefs.deepSeekThinkingEnabled)
         .toString(2)
 
     private fun showImportApiConfigDialog() {
@@ -619,6 +631,9 @@ class SettingsActivity : AppCompatActivity() {
                     prefs.replyModel = o.optString("replyModel", prefs.replyModel)
                     prefs.visionBaseUrl = o.optString("visionBaseUrl", prefs.visionBaseUrl)
                     prefs.visionModel = o.optString("visionModel", prefs.visionModel)
+                    if (o.has("deepSeekThinkingEnabled")) {
+                        prefs.deepSeekThinkingEnabled = o.optBoolean("deepSeekThinkingEnabled", false)
+                    }
                     Toast.makeText(this, "API 配置已导入，请自行填写密钥并测试", Toast.LENGTH_LONG).show()
                     recreate()
                 } catch (e: Exception) {
