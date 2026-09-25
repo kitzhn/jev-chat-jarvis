@@ -13,6 +13,9 @@ import android.util.Log
  */
 class Prefs(context: Context, prefsName: String = PREFS_MAIN) {
 
+    /** Application context for local-only helpers such as API usage accounting. */
+    val appContext: Context = context.applicationContext
+
     private val sp = context.getSharedPreferences(prefsName, Context.MODE_PRIVATE)
 
     /**
@@ -345,9 +348,9 @@ class Prefs(context: Context, prefsName: String = PREFS_MAIN) {
 
         // Reply route presets (OpenAI-compatible chat completions).
         const val DEFAULT_REPLY_BASE = "https://openrouter.ai/api/v1"
-        const val DEFAULT_REPLY_MODEL = "deepseek/deepseek-chat-v3.1"
+        const val DEFAULT_REPLY_MODEL = "deepseek/deepseek-v4.1-flash"
         const val DEEPSEEK_BASE = "https://api.deepseek.com/v1"
-        const val DEEPSEEK_MODEL = "deepseek-chat"
+        const val DEEPSEEK_MODEL = "deepseek-flash"
         const val DASHSCOPE_BASE = "https://dashscope.aliyuncs.com/compatible-mode/v1"
         const val DASHSCOPE_MODEL = "qwen-plus"
 
