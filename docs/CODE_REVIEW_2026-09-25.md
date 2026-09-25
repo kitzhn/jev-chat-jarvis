@@ -27,6 +27,7 @@ Scope: `app/src/main`, `app/src/debug`, `integration-fixture`, Android manifests
 | MAJOR-06 | MAJOR | **APPROVAL REQUIRED** | Usage privacy | Usage records persist the raw custom `baseUrl`; a user who embeds credentials in URL query/userinfo could indirectly persist a secret in `api_usage.json`. |
 | MAJOR-07 | MAJOR / SECURITY | **APPROVAL REQUIRED** | API key routing | Reply/vision keys inherit the judge key even when the target host is a different provider, which can send one provider's credential to another provider. |
 | MAJOR-08 | MAJOR / SECURITY | **APPROVAL REQUIRED** | Transport | Custom API URLs are not restricted to HTTPS; a user can configure an `http://` endpoint and send bearer credentials/content in plaintext. |
+| MAJOR-09 | MAJOR | **APPROVAL REQUIRED** | DeepSeek behavior/cost | Official `deepseek-flash` defaults to high-effort thinking; current short-reply/OCR calls do not disable it, so `temperature` is ignored and reasoning tokens can add latency/cost. |
 | MEDIUM-01 | MEDIUM | OPEN | Reply parsing | Malformed model output is padded with repeated `（稍等，我看下）`, producing duplicate strategy cards instead of surfacing a generation problem. |
 | MEDIUM-02 | MEDIUM | FIXED | API usage | A request was marked “exact” if only one of prompt/completion counts was exact. Now both are required. |
 | MEDIUM-03 | MEDIUM | FIXED | Jev retry | Knowledge-context fallback retried all 4xx, including 401/403/429. Now only schema-like 400/422 are retried. |
@@ -187,6 +188,20 @@ without transport encryption.
 
 **Approval required:** yes. This changes which custom endpoints are accepted.
 
+### MAJOR-09 — DeepSeek Flash defaults to high-effort thinking for simple reply/OCR calls
+
+**Files:**  
+- `app/src/main/java/com/jev/probe/jev/ReplyClient.kt`
+- `app/src/main/java/com/jev/probe/jev/VisionClient.kt`
+
+DeepSeek's current official API documents `deepseek-flash` as thinking-enabled by default, with default reasoning effort high. In thinking mode, `temperature` is ignored.
+
+Current Jev reply generation sends `temperature=0.85` expecting varied GalGame candidates, but on DeepSeek official this parameter does not control sampling while default thinking remains enabled. Short reply generation and OCR also pay for unnecessary reasoning tokens/latency.
+
+**Recommended fix:** make thinking mode explicit and configurable. Suggested default for Jev's reply drafting / summarization / OCR is non-thinking (`thinking.type=disabled`), with an advanced option to enable reasoning for users who prefer it. Do not assume the same wire parameter for every OpenAI-compatible provider.
+
+**Approval required:** yes. This changes model behavior, cost and potentially reply quality.
+
 ---
 
 ## MEDIUM / MINOR open items
@@ -258,4 +273,5 @@ No MAJOR item below should be implemented until explicitly approved:
 - [ ] MAJOR-06 — sanitize persisted API base URLs.
 - [ ] MAJOR-07 — make API key inheritance provider/host-aware.
 - [ ] MAJOR-08 — require HTTPS or explicit local-network opt-in for custom endpoints.
+- [ ] MAJOR-09 — make DeepSeek thinking mode explicit/configurable for reply and vision calls.
 
