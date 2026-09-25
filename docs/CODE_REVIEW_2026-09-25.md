@@ -20,14 +20,14 @@ Scope: `app/src/main`, `app/src/debug`, `integration-fixture`, Android manifests
 | ID | Level | Status | Area | Finding |
 |---|---|---|---|---|
 | MAJOR-01 | MAJOR | **APPROVAL REQUIRED** | Async analysis | Old network results can paint a newer conversation because there is no analysis generation/session token. |
-| MAJOR-02 | MAJOR | **APPROVAL REQUIRED** | API usage | `MAX_RECORDS = 5000` silently truncates a busy month's usage and can under-report “本月费用”. |
-| MAJOR-03 | MAJOR | **APPROVAL REQUIRED** | Vision accounting | Fallback token estimation counts Base64 request length when a vision provider omits usage; this can substantially overestimate image cost. |
-| MAJOR-04 | MAJOR | **APPROVAL REQUIRED** | Test architecture | `integration-fixture` is always included in the root Gradle project and owns QQ/WeChat package names for CI. Production workflows are scoped, but the fixture remains part of normal project sync. |
+| MAJOR-02 | MAJOR | **FIXED 2026-09-25** | API usage | Detail remains capped at 5000; evicted rows now roll into daily aggregates so current-day/month totals are retained. |
+| MAJOR-03 | MAJOR | **FIXED 2026-09-25** | Vision accounting | Vision prompt tokens are now marked unknown when provider usage is missing; Base64 length is never treated as billed image tokens. |
+| MAJOR-04 | MAJOR | **FIXED 2026-09-25** | Test architecture | `integration-fixture` is excluded from normal sync and included only when `JEV_INTEGRATION_FIXTURES=1` (or the matching Gradle property) is set. |
 | MAJOR-05 | MAJOR / DEAD-CODE | **APPROVAL REQUIRED** | Accessibility legacy | Legacy `SelectToSpeakService` and `config_disguised.xml` remain in source although production Manifest now uses normal `ChatCaptureService`. They should be deleted after approval. |
-| MAJOR-06 | MAJOR | **APPROVAL REQUIRED** | Usage privacy | Usage records persist the raw custom `baseUrl`; a user who embeds credentials in URL query/userinfo could indirectly persist a secret in `api_usage.json`. |
+| MAJOR-06 | MAJOR | **FIXED 2026-09-25** | Usage privacy | Persisted base URLs now strip userinfo, query and fragment; legacy records are sanitized during the v2 usage-state migration. |
 | MAJOR-07 | MAJOR / SECURITY | **APPROVAL REQUIRED** | API key routing | Reply/vision keys inherit the judge key even when the target host is a different provider, which can send one provider's credential to another provider. |
 | MAJOR-08 | MAJOR / SECURITY | **APPROVAL REQUIRED** | Transport | Custom API URLs are not restricted to HTTPS; a user can configure an `http://` endpoint and send bearer credentials/content in plaintext. |
-| MAJOR-09 | MAJOR | **APPROVAL REQUIRED** | DeepSeek behavior/cost | Official `deepseek-flash` defaults to high-effort thinking; current short-reply/OCR calls do not disable it, so `temperature` is ignored and reasoning tokens can add latency/cost. |
+| MAJOR-09 | MAJOR | **FIXED 2026-09-25** | DeepSeek behavior/cost | Official `deepseek-flash` reply/vision calls now send an explicit thinking mode; default is disabled with an advanced user toggle. |
 | MAJOR-10 | MAJOR / SECURITY | **APPROVAL REQUIRED** | Debug distribution | Debug integration receiver/activity are exported and therefore unsafe to ship as the APK given to friends. |
 | MEDIUM-01 | MEDIUM | **FIXED** | Reply parsing | Incomplete/malformed candidate output now surfaces a retryable generation error instead of duplicate filler cards. |
 | MEDIUM-02 | MEDIUM | FIXED | API usage | A request was marked “exact” if only one of prompt/completion counts was exact. Now both are required. |
@@ -75,7 +75,9 @@ Risk sequence:
 
 **Approval required:** yes. This changes core concurrency behavior.
 
-### MAJOR-02 — monthly usage can silently undercount
+### MAJOR-02 — monthly usage can silently undercount — FIXED
+
+**Resolution (approved 2026-09-25):** usage storage is migrated to an atomic v2 state containing the latest 5000 detail rows plus daily rollups for evicted rows (400-day retention). Today/current-month totals and breakdowns combine detail + rollups.
 
 **File:**  
 - `app/src/main/java/com/jev/probe/core/usage/ApiUsageStore.kt`
@@ -88,7 +90,9 @@ The dashboard still labels the remaining sum as “本月”, so old requests ca
 
 **Approval required:** yes. Storage schema / migration change.
 
-### MAJOR-03 — vision fallback cost estimate can be misleading
+### MAJOR-03 — vision fallback cost estimate can be misleading — FIXED
+
+**Resolution (approved 2026-09-25):** when a vision response lacks prompt token usage, image input tokens are stored as unknown rather than estimated from serialized Base64. Legacy non-exact vision rows are migrated to unknown-token semantics.
 
 **File:**  
 - `app/src/main/java/com/jev/probe/core/usage/ApiUsageStore.kt`
@@ -101,7 +105,9 @@ When an API response lacks `usage`, fallback input tokens are estimated from the
 
 **Approval required:** yes. Changes dashboard accounting semantics.
 
-### MAJOR-04 — integration fixture is part of the normal root project
+### MAJOR-04 — integration fixture is part of the normal root project — FIXED
+
+**Resolution (approved 2026-09-25):** `integration-fixture` is included only with `JEV_INTEGRATION_FIXTURES=1` or `-PjevIntegrationFixtures=true`; the emulator workflow sets the CI environment flag.
 
 **Files:**  
 - `settings.gradle.kts`
@@ -125,7 +131,9 @@ The production Manifest now registers the normal `ChatCaptureService`, and WeCha
 
 **Approval required:** yes, because this is security-sensitive cleanup and intentionally removes a prior compatibility mechanism.
 
-### MAJOR-06 — raw custom base URL can persist embedded credentials
+### MAJOR-06 — raw custom base URL can persist embedded credentials — FIXED
+
+**Resolution (approved 2026-09-25):** usage persistence sanitizes URLs to scheme + host + port + path, stripping userinfo/query/fragment. Existing rows are scrubbed when the usage state migrates.
 
 **File:**  
 - `app/src/main/java/com/jev/probe/core/usage/ApiUsageStore.kt`
@@ -189,7 +197,9 @@ without transport encryption.
 
 **Approval required:** yes. This changes which custom endpoints are accepted.
 
-### MAJOR-09 — DeepSeek Flash defaults to high-effort thinking for simple reply/OCR calls
+### MAJOR-09 — DeepSeek Flash defaults to high-effort thinking for simple reply/OCR calls — FIXED
+
+**Resolution (approved 2026-09-25):** official `api.deepseek.com` + `deepseek-flash` calls now explicitly send `thinking.type`; default is `disabled` for reply/vision/OCR and an advanced shared toggle can enable it. When enabled, Jev omits `temperature` because DeepSeek ignores it in thinking mode.
 
 **Files:**  
 - `app/src/main/java/com/jev/probe/jev/ReplyClient.kt`
@@ -277,16 +287,16 @@ These are time-sensitive and should be rechecked when updating model presets or 
 
 ## Owner approval checklist
 
-No MAJOR item below should be implemented until explicitly approved:
+No MAJOR item below should be implemented until explicitly approved. Checked items were explicitly approved by the owner on 2026-09-25 and implemented on the review branch:
 
 - [ ] MAJOR-01 — add analysis generation/session guard.
-- [ ] MAJOR-02 — redesign usage storage to retain monthly aggregates.
-- [ ] MAJOR-03 — change vision missing-usage accounting semantics.
-- [ ] MAJOR-04 — conditionally include the integration fixture module.
+- [x] MAJOR-02 — redesign usage storage to retain monthly aggregates.
+- [x] MAJOR-03 — change vision missing-usage accounting semantics.
+- [x] MAJOR-04 — conditionally include the integration fixture module.
 - [ ] MAJOR-05 — delete legacy disguised accessibility artifacts.
-- [ ] MAJOR-06 — sanitize persisted API base URLs.
+- [x] MAJOR-06 — sanitize persisted API base URLs.
 - [ ] MAJOR-07 — make API key inheritance provider/host-aware.
 - [ ] MAJOR-08 — require HTTPS or explicit local-network opt-in for custom endpoints.
-- [ ] MAJOR-09 — make DeepSeek thinking mode explicit/configurable for reply and vision calls.
+- [x] MAJOR-09 — make DeepSeek thinking mode explicit/configurable for reply and vision calls.
 - [ ] MAJOR-10 — move exported CI controls out of the distributable Debug APK.
 

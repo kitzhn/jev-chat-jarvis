@@ -156,6 +156,16 @@ class Prefs(context: Context, prefsName: String = PREFS_MAIN) {
         get() = sp.getString(K_VISION_MODEL, DEFAULT_VISION_MODEL) ?: DEFAULT_VISION_MODEL
         set(v) = sp.edit().putString(K_VISION_MODEL, v.trim()).apply()
 
+    /**
+     * Advanced DeepSeek official toggle shared by reply + vision/OCR routes.
+     * V4.1 Flash defaults to thinking upstream, but Jev's short drafting/OCR
+     * tasks default this OFF to avoid unnecessary reasoning tokens and latency.
+     * This flag is ignored for non-DeepSeek hosts/models.
+     */
+    var deepSeekThinkingEnabled: Boolean
+        get() = sp.getBoolean(K_DEEPSEEK_THINKING, false)
+        set(v) = sp.edit().putBoolean(K_DEEPSEEK_THINKING, v).apply()
+
     // -------------------------------------------------------- context (D)
 
     /**
@@ -323,6 +333,7 @@ class Prefs(context: Context, prefsName: String = PREFS_MAIN) {
         private const val K_VISION_BASE = "vision_base_url"
         private const val K_VISION_KEY = "vision_key"
         private const val K_VISION_MODEL = "vision_model"
+        private const val K_DEEPSEEK_THINKING = "deepseek_thinking_enabled"
         private const val K_CTX_ENABLED = "context_enabled"
         private const val K_CTX_COUNT = "context_history_count"
         private const val K_AUTO_SUMMARY = "auto_summary"

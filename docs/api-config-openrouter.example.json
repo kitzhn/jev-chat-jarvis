@@ -6,5 +6,6 @@
   "replyBaseUrl": "https://openrouter.ai/api/v1",
   "replyModel": "deepseek/deepseek-v4.1-flash",
   "visionBaseUrl": "https://openrouter.ai/api/v1",
-  "visionModel": "qwen/qwen2.5-vl-72b-instruct"
+  "visionModel": "qwen/qwen2.5-vl-72b-instruct",
+  "deepSeekThinkingEnabled": false
 }
