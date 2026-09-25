@@ -186,7 +186,9 @@ object JevQuestions {
         val msgs = JSONArray()
         val last10 = snapshot.messages.takeLast(10)
         for (m in last10) {
-            msgs.put(JSONObject().put("from", m.side).put("text", m.text))
+            val text = if (m.side == "other" && !m.speaker.isNullOrBlank())
+                m.speaker + "：" + m.text else m.text
+            msgs.put(JSONObject().put("from", m.side).put("text", text))
         }
         val chat = JSONObject()
             .put("relationship", relationship)
@@ -196,7 +198,11 @@ object JevQuestions {
         if (background.isNotBlank()) state.put("background", background)
         if (history.isNotEmpty()) {
             val h = JSONArray()
-            history.forEach { h.put(JSONObject().put("from", it.side).put("text", it.text)) }
+            history.forEach {
+                val text = if (it.side == "other" && !it.speaker.isNullOrBlank())
+                    it.speaker + "：" + it.text else it.text
+                h.put(JSONObject().put("from", it.side).put("text", text))
+            }
             state.put("history", h)
         }
         return state
