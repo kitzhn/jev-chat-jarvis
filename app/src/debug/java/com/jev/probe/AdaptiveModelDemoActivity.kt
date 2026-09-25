@@ -62,6 +62,22 @@ class AdaptiveModelDemoActivity : AppCompatActivity() {
             "com.jev.probe.capture.WeChatNotificationListener"
         )
 
+        // MAJOR-07: blank route keys may inherit only on the same API origin.
+        val securityPrefsName = "security_key_routing_demo"
+        val securityPrefs = Prefs(this, securityPrefsName).apply {
+            judgeBaseUrl = Prefs.DEFAULT_JUDGE_BASE_OPENROUTER
+            judgeKey = "judge-openrouter-secret"
+            replyKey = ""
+            visionKey = ""
+            replyBaseUrl = Prefs.DEEPSEEK_BASE
+            visionBaseUrl = Prefs.DEEPSEEK_BASE
+        }
+        val crossProviderReplyBlocked = securityPrefs.effectiveReplyKey().isBlank()
+        securityPrefs.replyKey = "deepseek-secret"
+        val sameProviderVisionInherited =
+            securityPrefs.effectiveVisionKey() == "deepseek-secret"
+        getSharedPreferences(securityPrefsName, MODE_PRIVATE).edit().clear().apply()
+
         val checks = listOf(
             "群会话" to (ctx.groupContact?.name == "演示旅行群"),
             "当前发言人" to (ctx.speakerContact?.name == "演示联系人 A"),
@@ -70,6 +86,8 @@ class AdaptiveModelDemoActivity : AppCompatActivity() {
             "同会话通知放行" to sameAllowed,
             "异会话通知拦截" to otherBlocked,
             "通知监听权限" to listenerEnabled,
+            "跨供应商密钥阻断" to crossProviderReplyBlocked,
+            "同供应商视觉密钥继承" to sameProviderVisionInherited,
             "四策略重排" to (top?.strategy == ReplyStrategy.PLAYFUL)
         )
 
