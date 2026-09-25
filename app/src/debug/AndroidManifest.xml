@@ -8,6 +8,9 @@
             android:name="com.jev.probe.WeChatOcrDemoActivity"
             android:exported="true" />
         <activity
+            android:name="com.jev.probe.AdaptiveModelDemoActivity"
+            android:exported="true" />
+        <activity
             android:name="com.jev.probe.V23FeatureDemoActivity"
             android:exported="true" />
     </application>
