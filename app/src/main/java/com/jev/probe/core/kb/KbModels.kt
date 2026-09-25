@@ -115,7 +115,13 @@ object AffectionScale {
 }
 
 /** One remembered chat line. side is "me" / "other", matching [com.jev.probe.core.Msg]. */
-data class LogEntry(val side: String, val text: String, val ts: Long, val app: String)
+data class LogEntry(
+    val side: String,
+    val text: String,
+    val ts: Long,
+    val app: String,
+    val speaker: String? = null
+)
 
 /**
  * What one analysis gets to see beyond the on-screen messages: who the other
