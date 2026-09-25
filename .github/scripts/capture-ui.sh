@@ -10,6 +10,24 @@ trap 'code=$?; adb logcat -d -v time > integration-results/failure-logcat.txt 2>
 
 adb install -r "$APK"
 
+wait_activity() {
+  local component="$1"
+  local out
+  for _ in $(seq 1 12); do
+    out="$(adb shell dumpsys activity activities 2>/dev/null || true)"
+    if printf '%s' "$out" | grep -Fq "$component"; then
+      return 0
+    fi
+    sleep .5
+  done
+  echo "activity not observed: $component" >&2
+  return 1
+}
+
+mark_stage() {
+  printf '%s\n' "$1" > integration-results/stage.txt
+}
+
 python3 - <<'PY'
 import json, time, os
 now = int(time.time() * 1000)
@@ -167,17 +185,23 @@ for attempt in range(10):
 raise SystemExit(f"{mode} text not found: {target}")
 PY
 
+mark_stage "01-home"
 adb shell am force-stop "$PKG"
 adb shell am start -W -n "$PKG/com.jev.probe.MainActivity" >/dev/null
-sleep 2
+wait_activity "$PKG/com.jev.probe.MainActivity"
+sleep 1
 adb exec-out screencap -p > screenshots/01-home.png
 
-adb shell am start -n "$PKG/com.jev.probe.SettingsActivity" >/dev/null
-python3 /tmp/ui_text.py wait "设置"
+mark_stage "02-settings"
+adb shell am start -W -n "$PKG/com.jev.probe.SettingsActivity" >/dev/null
+wait_activity "$PKG/com.jev.probe.SettingsActivity"
+sleep 1
 adb exec-out screencap -p > screenshots/02-settings.png
 
-adb shell am start -n "$PKG/com.jev.probe.KnowledgeActivity" >/dev/null
-python3 /tmp/ui_text.py wait "知识库与联系人"
+mark_stage "03-knowledge"
+adb shell am start -W -n "$PKG/com.jev.probe.KnowledgeActivity" >/dev/null
+wait_activity "$PKG/com.jev.probe.KnowledgeActivity"
+sleep 1
 python3 /tmp/ui_text.py exact "联系人"
 adb exec-out screencap -p > screenshots/03-contacts.png
 
@@ -185,6 +209,7 @@ python3 /tmp/ui_text.py exact "关系网"
 sleep 1
 adb exec-out screencap -p > screenshots/04-relationship-graph.png
 
+mark_stage "05-galgame"
 # Debug-only overlay demo: this exercises the real OverlayController with
 # GalGame-style option cards, then taps one option and verifies the chosen text
 # appears in the mock chat input box.
@@ -214,6 +239,7 @@ print("strategy learning persisted:", a["strategySelections"])
 PY
 
 
+mark_stage "07-wechat-ocr-geometry"
 # Relationship-aware GalGame cards are already captured in 05/06. Now verify
 # the pure WeChat OCR geometry stage with deterministic OCR boxes.
 adb shell am start -W -n "$PKG/com.jev.probe.WeChatOcrDemoActivity" >/dev/null
@@ -221,12 +247,14 @@ sleep 1
 python3 /tmp/ui_text.py wait "PASS · other → me → other"
 adb exec-out screencap -p > screenshots/07-wechat-ocr-geometry.png
 
+mark_stage "08-wechat-settings"
 # Show the opt-in WeChat auto-OCR setting in the real SettingsActivity.
 adb shell am start -n "$PKG/com.jev.probe.SettingsActivity" >/dev/null
 sleep 1
 python3 /tmp/ui_text.py contains "微信优先用新消息通知触发 OCR"
 adb exec-out screencap -p > screenshots/08-wechat-auto-ocr-setting.png
 
+mark_stage "09-adaptive-core"
 # Grant notification-listener access to the real production service declaration,
 # then run a debug-only integration page that exercises the actual group context,
 # scene detector, learned strategy counts and notification matching gate.
@@ -240,6 +268,7 @@ adb exec-out screencap -p > screenshots/09-adaptive-core.png
 # Final v2.3 adaptive regression on current main.
 
 
+mark_stage "10-api-dashboard"
 # API usage dashboard: real production activity reading local-only usage records.
 adb shell am start -W -n "$PKG/com.jev.probe.ApiUsageActivity" >/dev/null
 sleep 1
@@ -247,6 +276,7 @@ python3 /tmp/ui_text.py wait "API 消耗仪表盘"
 adb exec-out screencap -p > screenshots/10-api-usage-dashboard.png
 
 # ---------------------------------------------------------------------------
+mark_stage "11-cross-app-install"
 # Cross-app integration fixtures. These are separate APKs whose runtime package
 # names match QQ / WeChat, so the real AccessibilityService and
 # NotificationListener exercise cross-process routing rather than an in-process
@@ -265,6 +295,7 @@ adb shell appops set "$PKG" SYSTEM_ALERT_WINDOW allow
 adb shell am start -W -n "$PKG/com.jev.probe.IntegrationSetupActivity" >/dev/null
 sleep 2
 
+mark_stage "11-qq-accessibility"
 # QQ: real package routing + resource-id adapter + group speaker extraction.
 adb logcat -c
 adb shell am start -W -n "com.tencent.mobileqq/com.jev.fixture.FixtureActivity" >/dev/null
@@ -273,12 +304,14 @@ adb logcat -d -v brief -s JEVASSIST:D > integration-results/qq-accessibility.txt
 grep -E 'snapshot\[com\.tencent\.mobileqq\].*n=3' integration-results/qq-accessibility.txt
 adb exec-out screencap -p > screenshots/11-qq-cross-app.png
 
+mark_stage "12-qq-fill"
 # Exercise the real fillInput path against QQ's separate-process EditText.
 adb shell am broadcast   -n "$PKG/com.jev.probe.IntegrationCommandReceiver"   -a "io.github.kitzhn.jevultimate.debug.FILL_FOR_TEST"   --es text "QQ跨进程填入成功" >/dev/null
 sleep 2
 python3 /tmp/ui_text.py wait "QQ跨进程填入成功"
 adb exec-out screencap -p > screenshots/12-qq-fill.png
 
+mark_stage "13-wechat-notification-ocr"
 # WeChat: notification -> title gate -> Accessibility screenshot -> local ML Kit
 # OCR. Message nodes are not consumed by an adapter in this path.
 adb shell am start -W -n "$PKG/com.jev.probe.IntegrationSetupActivity" >/dev/null
@@ -289,10 +322,12 @@ adb logcat -d -v brief -s JEVASSIST:I > integration-results/wechat-ocr.txt
 grep -E 'ocr\[com\.tencent\.mm\] msgs=[1-9]' integration-results/wechat-ocr.txt
 adb exec-out screencap -p > screenshots/13-wechat-notification-ocr.png
 
+mark_stage "14-wechat-fill"
 # Fill is still user-triggered; verify the same cross-app input path works.
 adb shell am broadcast   -n "$PKG/com.jev.probe.IntegrationCommandReceiver"   -a "io.github.kitzhn.jevultimate.debug.FILL_FOR_TEST"   --es text "微信跨进程填入成功" >/dev/null
 sleep 2
 python3 /tmp/ui_text.py wait "微信跨进程填入成功"
 adb exec-out screencap -p > screenshots/14-wechat-fill.png
 
+mark_stage "PASS"
 printf '%s\n'   'QQ: package routing + accessibility adapter + 3 messages + fill PASS'   'WeChat: notification gate + accessibility screenshot + local OCR + fill PASS'   > integration-results/summary.txt
