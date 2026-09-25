@@ -66,6 +66,10 @@ android {
     // Uncompressed, page-aligned .so files: required for the 16 KB page-size
     // devices Android 15+ ships, and it lets the loader mmap the ML Kit natives
     // instead of unpacking them at install time.
+    buildFeatures {
+        buildConfig = true
+    }
+
     packaging {
         jniLibs {
             useLegacyPackaging = false
