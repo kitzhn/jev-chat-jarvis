@@ -182,6 +182,11 @@ class Prefs(context: Context, prefsName: String = PREFS_MAIN) {
         get() = sp.getBoolean(K_WECHAT_AUTO_OCR, false)
         set(v) = sp.edit().putBoolean(K_WECHAT_AUTO_OCR, v).apply()
 
+    /** Prefer WeChat notifications as the trigger for automatic OCR. */
+    var wechatNotificationTrigger: Boolean
+        get() = sp.getBoolean(K_WECHAT_NOTIFICATION_TRIGGER, false)
+        set(v) = sp.edit().putBoolean(K_WECHAT_NOTIFICATION_TRIGGER, v).apply()
+
     // ------------------------------------------------------------- existing
 
     /** Free-text describing who the other person is; goes into Jev's state. */
@@ -294,6 +299,7 @@ class Prefs(context: Context, prefsName: String = PREFS_MAIN) {
         private const val K_OCR_FALLBACK = "ocr_fallback"
         private const val K_OCR_AUTO = "ocr_auto_analyze"
         private const val K_WECHAT_AUTO_OCR = "wechat_auto_ocr"
+        private const val K_WECHAT_NOTIFICATION_TRIGGER = "wechat_notification_trigger"
         private const val K_REL = "relationship"
         private const val K_ENABLED = "enabled"
         private const val K_WHITELIST = "whitelist"
