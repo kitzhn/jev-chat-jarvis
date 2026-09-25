@@ -12,7 +12,7 @@
 [![Android](https://img.shields.io/badge/Android-11%2B-3DDC84?style=flat-square&logo=android&logoColor=white)](#快速开始)
 [![License](https://img.shields.io/github/license/jev-chat/jev-chat-jarvis?style=flat-square)](LICENSE)
 
-[官网](https://chatjevs.com) · [下载 APK](apk/jev-assistant-v1.4-release.apk) · [历史版本](https://github.com/jev-chat/jev-chat-jarvis/releases) · [更新日志](CHANGELOG.md) · [macOS 版](https://github.com/jev-chat/jev-chat-mac) · [Windows 版](https://github.com/jev-chat/jev-chat-windows)
+[官网](https://chatjevs.com) · [Ultimate 下载](https://github.com/kitzhn/jev-chat-jarvis/actions/workflows/build-debug.yml) · [上游历史版本](https://github.com/jev-chat/jev-chat-jarvis/releases) · [更新日志](CHANGELOG.md) · [macOS 版](https://github.com/jev-chat/jev-chat-mac) · [Windows 版](https://github.com/jev-chat/jev-chat-windows)
 
 </div>
 
@@ -90,11 +90,13 @@
 
 ## 快速开始
 
-**1. 装包。** 仓库里有签好名的 release 包：[`apk/jev-assistant-v1.4-release.apk`](apk/jev-assistant-v1.4-release.apk)（Android 11+，仅支持 ARM64 / `arm64-v8a`）。各版本安装包也在 [Releases](https://github.com/jev-chat/jev-chat-jarvis/releases)。
+**1. 装包。** Ultimate 版请优先从本 Fork 的 GitHub Actions 下载，而不是安装仓库里保留的上游 v1.4 APK：
 
-```bash
-adb install -r apk/jev-assistant-v1.4-release.apk
-```
+- **自己测试：** [Build Android Debug APK](https://github.com/kitzhn/jev-chat-jarvis/actions/workflows/build-debug.yml) → 打开最新成功运行 → Artifacts → `jev-ultimate-debug`。
+- **长期安装 / 给朋友：** [Build Signed Ultimate Release](https://github.com/kitzhn/jev-chat-jarvis/actions/workflows/build-release.yml) → Artifacts → `jev-ultimate-release`。
+- **模拟器验证截图：** [Android 15 Emulator Regression](https://github.com/kitzhn/jev-chat-jarvis/actions/workflows/ui-emulator.yml) → Artifacts → `jev-ultimate-emulator-evidence`。
+
+Android 11+，当前构建面向 ARM64 / `arm64-v8a`。Debug 与 Release 签名不同，互相切换时可能需要先卸载旧包。
 
 **2. 填密钥。** 打开 App → 设置 →「接口」分三张卡：判断接口 / 回复接口 / 视觉接口。最简单只填「判断接口」一栏的 [OpenRouter](https://openrouter.ai/) API Key，其余两栏留空会自动继承这把密钥就能用。想换回复模型（默认 `deepseek/deepseek-chat-v3.1`，国内 Gemini / OpenAI 会被区域限制）就在「回复接口」选预设（OpenRouter / DeepSeek 官方 / 通义兼容）或自填地址，每张卡都有独立的一键连通测试。
 
@@ -126,12 +128,12 @@ adb install -r apk/jev-assistant-v1.4-release.apk
 
 ### 接口与模型
 
-- 判断 / 回复 / 视觉三路的地址、密钥、模型分别可填。
+- 判断 / 回复 / 视觉三路的地址、密钥、模型分别可填。远程自定义接口必须使用 HTTPS；仅 localhost / 127.0.0.1 等本机回环地址允许 HTTP 调试。
 - 判断接口新增内置预设「博查 Jev」，1.4 起排在选项最前（博查 Jev / OpenRouter / TypeSafe 直连 / 自定义），选中后自动填好服务地址 `https://jev.bocha.cn` 与模型 `bocha-jev-v1`（协议与 TypeSafe 一致），页面上会显示官方地址并支持一键复制，当前限时免费。全新安装默认使用博查 Jev；已经配置过判断接口的老用户不受影响，provider 和密钥都不会被改动。
 - 判断接口另有「Vercel」预设：地址 `https://ai-gateway.vercel.sh/typesafe`，模型 `typesafe-ai/jev`，密钥用 [Vercel AI Gateway](https://vercel.com/ai-gateway/models/jev) 的 key。协议与 TypeSafe 直连相同（`POST /v1/systemone`）。
 - 判断接口另有「OpenCode Zen」预设：地址 `https://opencode.ai/zen`，模型 `jev-1.13`（输出免费、输入 $0.042/M，一次判断约 1000 输入 token），密钥用 [OpenCode Zen](https://opencode.ai/zen) 的 key。协议与 TypeSafe 直连相同（`POST /v1/systemone`）；想全免费可手动改成 `jev-1.13-free`（限时，功能受限）。
 - 内置 OpenRouter、TypeSafe 直连、Vercel、OpenCode Zen、DeepSeek 官方、通义兼容预设，每张卡一键连通测试。
-- 只有一把密钥也能用：回复、视觉留空自动继承判断接口的配置。
+- 只有一把密钥也能用，但**只会在同一服务商/同一规范化主机内继承**。如果判断、回复、视觉切到不同服务商，必须为对应路由单独填写 Key，避免把 A 服务商凭据发给 B 服务商。
 - 从旧版本升级时，原来那把密钥会一次性迁移到新的三卡结构。
 
 ### 采集与 OCR
@@ -255,7 +257,9 @@ JEV_INTEGRATION_FIXTURES=1 ./gradlew :app:assembleDebug :integration-fixture:ass
   - `KnowledgeActivity` 知识库管理页（笔记 / 联系人）
 - `tools/jev/` — Jev 题目集与校准脚手架（Python）
 - `docs/` — 设计与验收文档
-- `apk/` — 签好名的 release 包
+- `apk/` — 上游历史 APK（Ultimate 请使用上面的 Actions 下载入口）
+
+普通 Debug 构建中的 CI 控制组件默认 **不导出**；只有 Android 模拟器回归在设置 `JEV_INTEGRATION_FIXTURES=1` 时才临时导出测试入口。
 
 </details>
 
@@ -274,7 +278,7 @@ JEV_INTEGRATION_FIXTURES=1 ./gradlew :app:assembleDebug :integration-fixture:ass
 - **X 只按中文界面验过**：分隔符 `：`、`上午 / 下午`、`Read` 是中文界面实测；英文界面只做了兜底，未验。
 - **群聊**：按一对一分析，「对方」与关系设定对群聊不准。
 - **中文**：Jev 主训练语言是英文，题目用英文、聊天内容保留中文；建议用自己的真实对话做一批标注校准（见 `tools/jev/`）。
-- **微信不可用**：微信从 8.0.52+ 对普通无障碍服务隐藏了消息文字，近期又对部分账号/设备的聊天界面开启了防截屏（FLAG_SECURE），两条读取路径都不通，这是微信自身的限制，本项目没有其它技术手段可以读取；**1.4 起不再对微信做任何读取、截屏或填入，进入微信只提示一次「微信已限制读取，请在别的软件上使用」**。
+- **微信仍属实验支持**：普通无障碍节点读取不可靠，因此当前路径是“通知触发 → 当前会话标题匹配 → Accessibility screenshot → 本地 ML Kit OCR”。如果微信/ROM 使用受保护窗口或拒绝截图，会自动降级；项目不会尝试绕过系统或应用的防截屏策略。
 - **知识库检索是标签/标题包含匹配**，不做语义检索，笔记请打好标签才能被命中。历史按「谁说 + 原文」去重，同一个人重复说同一句只记一次。
 - **OCR 依赖系统放行截屏**：无障碍服务要被系统允许截屏才能用，小米 / HyperOS 可能拒绝（面板会提示失败原因）；受保护窗口（`FLAG_SECURE`）截不到。
 - **OCR 只认屏幕上看得见的部分**：长消息被截断的部分读不到；识别有错字。
