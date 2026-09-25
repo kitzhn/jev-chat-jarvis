@@ -32,7 +32,11 @@ android {
         // The target phone (and every phone this can run on: minSdk 30) is
         // arm64, so keep only that one — the other three are dead weight.
         ndk {
-            abiFilters += listOf("arm64-v8a")
+            val targetAbis = (System.getenv("JEV_ABI") ?: "arm64-v8a")
+                .split(",")
+                .map { it.trim() }
+                .filter { it.isNotEmpty() }
+            abiFilters += targetAbis
         }
     }
 
