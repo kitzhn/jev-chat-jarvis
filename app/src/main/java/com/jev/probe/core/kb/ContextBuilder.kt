@@ -36,8 +36,20 @@ object ContextBuilder {
         val store = KbStore.get(context)
         val title = snapshot.title ?: ""
 
-        // 1. Contact — matched only, never created here.
-        val contact = store.findContact(title, app)
+        // 1. Conversation contact + optional current group speaker.
+        // A group is represented separately from its current speaker. When a
+        // speaker can be matched, reply adaptation follows that person; otherwise
+        // it gracefully falls back to the group contact as before.
+        val conversationContact = store.findContact(title, app)
+        val inferredGroup = snapshot.conversationKind == "group" ||
+            isGroupTitle(title) ||
+            snapshot.messages.mapNotNull { it.speaker }.distinct().size > 1
+        val speakerName = if (inferredGroup)
+            snapshot.messages.lastOrNull { it.side == "other" && !it.speaker.isNullOrBlank() }?.speaker
+        else null
+        val speakerContact = speakerName?.let { store.findContact(it, app) }
+        val groupContact = if (inferredGroup) conversationContact else null
+        val contact = speakerContact ?: conversationContact
 
         // 2. History — recorded and injected only with the user's opt-in.
         val history = if (prefs.contextEnabled && contact != null)
@@ -61,7 +73,15 @@ object ContextBuilder {
 
         Log.d(TAG, "context: contact=${contact != null} notes=${alwaysOn.size + trimmedHits.size} " +
             "history=${trimmedHistory.size} graph=${graph.size}")
-        return ChatContext(contact, trimmedHistory, alwaysOn + trimmedHits, graph)
+        return ChatContext(
+            contact = contact,
+            history = trimmedHistory,
+            notes = alwaysOn + trimmedHits,
+            relationshipGraph = graph,
+            groupContact = groupContact,
+            speakerContact = speakerContact,
+            speakerName = speakerName
+        )
     }
 
     /**
@@ -117,9 +137,13 @@ object ContextBuilder {
             .take(MAX_HIT_NOTES)
     }
 
+    private fun isGroupTitle(title: String): Boolean =
+        GROUP_COUNT.containsMatchIn(title)
+
     private fun cost(notes: List<Note>, history: List<LogEntry>): Int =
         notes.sumOf { it.title.length + it.content.length + 2 } +
             history.sumOf { it.text.length + 3 }
 
+    private val GROUP_COUNT = Regex("""[（(]\s*\d+\s*[）)]""")
     private const val TAG = "JEVASSIST"
 }
