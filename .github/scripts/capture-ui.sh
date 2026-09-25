@@ -440,9 +440,9 @@ grep -E 'snapshot\[com\.twitter\.android\].*n=2' integration-results/x-accessibi
 adb shell am broadcast \
   -n "$PKG/com.jev.probe.IntegrationCommandReceiver" \
   -a "io.github.kitzhn.jevultimate.debug.FILL_FOR_TEST" \
-  --es text "X 跨进程填入成功" >/dev/null
+  --es text "X跨进程填入成功" >/dev/null
 sleep 2
-python3 /tmp/ui_text.py wait "X 跨进程填入成功"
+python3 /tmp/ui_text.py wait "X跨进程填入成功"
 adb exec-out screencap -p > screenshots/15-x-fill.png
 
 mark_stage "16-feishu-ocr-fill"
