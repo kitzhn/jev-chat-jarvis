@@ -168,10 +168,19 @@ class Prefs(context: Context, prefsName: String = PREFS_MAIN) {
         get() = sp.getBoolean(K_OCR_FALLBACK, true)
         set(v) = sp.edit().putBoolean(K_OCR_FALLBACK, v).apply()
 
-    /** Auto-analyze in OCR mode (default off: OCR costs a screenshot each time). */
+    /** Auto-analyze in generic OCR mode (default off: OCR costs a screenshot each time). */
     var ocrAutoAnalyze: Boolean
         get() = sp.getBoolean(K_OCR_AUTO, false)
         set(v) = sp.edit().putBoolean(K_OCR_AUTO, v).apply()
+
+    /**
+     * Experimental WeChat path. Accessibility events only trigger a debounced,
+     * rate-limited screenshot; message text itself is read by local OCR.
+     * Default OFF because some WeChat / OEM builds may reject screenshots.
+     */
+    var wechatAutoOcr: Boolean
+        get() = sp.getBoolean(K_WECHAT_AUTO_OCR, false)
+        set(v) = sp.edit().putBoolean(K_WECHAT_AUTO_OCR, v).apply()
 
     // ------------------------------------------------------------- existing
 
@@ -279,6 +288,7 @@ class Prefs(context: Context, prefsName: String = PREFS_MAIN) {
         private const val K_OCR_UNKNOWN = "ocr_unknown_apps"
         private const val K_OCR_FALLBACK = "ocr_fallback"
         private const val K_OCR_AUTO = "ocr_auto_analyze"
+        private const val K_WECHAT_AUTO_OCR = "wechat_auto_ocr"
         private const val K_REL = "relationship"
         private const val K_ENABLED = "enabled"
         private const val K_WHITELIST = "whitelist"
