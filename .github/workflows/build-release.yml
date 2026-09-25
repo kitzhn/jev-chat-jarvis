@@ -44,7 +44,7 @@ jobs:
         run: |
           if [ -n "$JEV_RELEASE_BUNDLE_B64" ]; then
             printf '%s' "$JEV_RELEASE_BUNDLE_B64" | base64 --decode > "$RUNNER_TEMP/jev-release-bundle.json"
-            python3 -c 'import json,base64,os; p=os.environ["RUNNER_TEMP"]; b=json.load(open(p+"/jev-release-bundle.json",encoding="utf-8")); req=("keystoreB64","storePassword","keyAlias","keyPassword"); missing=[k for k in req if not b.get(k)]; (missing and (_ for _ in ()).throw(SystemExit("Signing bundle missing: "+", ".join(missing)))); open(p+"/jev-ultimate.keystore","wb").write(base64.b64decode(b["keystoreB64"])); open(p+"/jev-release.properties","w",encoding="utf-8").write("storeFile="+p+"/jev-ultimate.keystore\\nstorePassword="+b["storePassword"]+"\\nkeyAlias="+b["keyAlias"]+"\\nkeyPassword="+b["keyPassword"]+"\\n")'
+            python3 -c 'import json,base64,os; p=os.environ["RUNNER_TEMP"]; b=json.load(open(p+"/jev-release-bundle.json",encoding="utf-8")); req=("keystoreB64","storePassword","keyAlias","keyPassword"); missing=[k for k in req if not b.get(k)]; (missing and (_ for _ in ()).throw(SystemExit("Signing bundle missing: "+", ".join(missing)))); open(p+"/jev-ultimate.keystore","wb").write(base64.b64decode(b["keystoreB64"])); open(p+"/jev-release.properties","w",encoding="utf-8").write("storeFile="+p+"/jev-ultimate.keystore\nstorePassword="+b["storePassword"]+"\nkeyAlias="+b["keyAlias"]+"\nkeyPassword="+b["keyPassword"]+"\n")'
             rm -f "$RUNNER_TEMP/jev-release-bundle.json"
             echo "Using JEV_RELEASE_BUNDLE_B64"
           else
