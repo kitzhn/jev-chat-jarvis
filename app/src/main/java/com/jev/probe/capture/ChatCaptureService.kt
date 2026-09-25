@@ -93,8 +93,7 @@ open class ChatCaptureService : AccessibilityService() {
     private var pendingWechatTitle: String? = null
     private var lastWechatAutoShotAt: Long = 0L
     private var lastWechatFailureNoticeAt: Long = 0L
-    private var lastWechatNotificationAt: Long = 0L
-    private val wechatAutoOcr = Runnable { runWechatAutoOcr() }
+     private val wechatAutoOcr = Runnable { runWechatAutoOcr() }
 
     override fun onServiceConnected() {
         super.onServiceConnected()
@@ -364,8 +363,7 @@ open class ChatCaptureService : AccessibilityService() {
 
         pendingWechatTitle = stableTitle
         lastGoodTitle[PKG_WECHAT] = stableTitle
-        lastWechatNotificationAt = SystemClock.elapsedRealtime()
-        main.removeCallbacks(wechatAutoOcr)
+         main.removeCallbacks(wechatAutoOcr)
         main.postDelayed(wechatAutoOcr, WECHAT_NOTIFICATION_SETTLE_MS)
     }
 
