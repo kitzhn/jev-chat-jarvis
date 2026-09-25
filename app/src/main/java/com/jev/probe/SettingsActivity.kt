@@ -198,7 +198,7 @@ class SettingsActivity : AppCompatActivity() {
         // --- 回复接口 ---
         val replyCard = card()
         replyCard.addView(cardTitle("回复接口"))
-        replyCard.addView(text("生成 3 条候选回复。任何 OpenAI 兼容地址，填到 /v1 为止。", 12f, sub))
+        replyCard.addView(text("生成 4 条 GalGame 风格候选，并结合联系人关系模型重新加权。任何 OpenAI 兼容地址，填到 /v1 为止。", 12f, sub))
 
         val replyBaseEdit = edit(prefs.replyBaseUrl, Prefs.DEFAULT_REPLY_BASE)
         val replyModelEdit = edit(prefs.replyModel, Prefs.DEFAULT_REPLY_MODEL)
@@ -364,7 +364,13 @@ class SettingsActivity : AppCompatActivity() {
         card2.addView(text("飞书正文是画上去的，节点树里读不到，这时截一次屏本地识别（不上传）。", 11f, sub))
         val ocrAutoRow = toggleRow("OCR 模式自动分析", prefs.ocrAutoAnalyze)
         card2.addView(ocrAutoRow)
-        card2.addView(text("关闭时 OCR 认完只亮悬浮球，点一下再分析。", 11f, sub))
+        card2.addView(text("关闭时通用 OCR 认完只亮悬浮球，点一下再分析。", 11f, sub))
+
+        val wechatAutoRow = toggleRow("微信实验模式：新消息后自动 OCR", prefs.wechatAutoOcr)
+        card2.addView(wechatAutoRow)
+        card2.addView(text(
+            "默认关闭。开启后由无障碍事件触发，约 0.9 秒防抖、至少 4 秒一次截图；本地 OCR 按左右位置推断双方。若系统或微信拒绝截图会自动降级，不会自动发送消息。",
+            11f, sub))
 
         // --- 知识库 / 关联上下文（D 阶段） ---
         val ctxRow = toggleRow("记录聊天历史（只存本机，用于关联上下文）", prefs.contextEnabled)
@@ -475,6 +481,7 @@ class SettingsActivity : AppCompatActivity() {
             prefs.autoAnalyze = (autoRow.tag as? Boolean) ?: true
             prefs.ocrFallback = (ocrFallbackRow.tag as? Boolean) ?: true
             prefs.ocrAutoAnalyze = (ocrAutoRow.tag as? Boolean) ?: false
+            prefs.wechatAutoOcr = (wechatAutoRow.tag as? Boolean) ?: false
             prefs.contextEnabled = (ctxRow.tag as? Boolean) ?: false
             prefs.contextHistoryCount =
                 ctxCountEdit.text.toString().trim().toIntOrNull()?.coerceIn(0, 100) ?: 30
