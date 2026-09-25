@@ -76,7 +76,8 @@ class ApiUsageActivity : AppCompatActivity() {
             addView(text("如何计算", 14f, ink, true))
             addView(text(
                 "• 响应带 usage 时优先使用真实 prompt/completion token。\n" +
-                "• 不返回 usage 的接口按请求/响应长度估算，并计入“估算请求”。\n" +
+                "• 文本接口不返回 usage 时按文本长度估算，并计入“估算请求”。\n" +
+                "• 视觉接口不返回 prompt token 时，图片 token 明确记为“未知”，不会再按 Base64 长度估算。\n" +
                 "• DeepSeek 官方 deepseek-flash 按北京时间峰谷价估算。\n" +
                 "• OpenRouter Jev 1.13 / DeepSeek V4.1 Flash 按当前公开价估算；若响应带 cost 则优先使用。\n" +
                 "• 自定义或未知价格接口只统计 token，不把费用伪装成 0 元。",
@@ -100,11 +101,13 @@ class ApiUsageActivity : AppCompatActivity() {
         addView(text("${ym.year} 年 ${ym.monthValue} 月", 12f, sub, true))
         addView(text(formatMoney(s.costCny), 32f, accent, true).apply { setPadding(0, dp(5), 0, 0) })
         addView(text("本月预计 API 费用", 12f, sub))
-        addView(text("${s.requests} 次请求 · 输入 ${formatTokens(s.inputTokens)} · 输出 ${formatTokens(s.outputTokens)}",
+        val inputLabel = if (s.unknownTokenRequests > 0) "已知输入" else "输入"
+        addView(text("${s.requests} 次请求 · ${inputLabel} ${formatTokens(s.inputTokens)} · 输出 ${formatTokens(s.outputTokens)}",
             12.5f, ink).apply { setPadding(0, dp(9), 0, 0) })
         if (s.cachedInputTokens > 0) addView(text("其中缓存命中 ${formatTokens(s.cachedInputTokens)}", 11.5f, green))
         val notes = buildList {
             if (s.estimatedRequests > 0) add("${s.estimatedRequests} 次 token 为估算")
+            if (s.unknownTokenRequests > 0) add("${s.unknownTokenRequests} 次图片 token 未知")
             if (s.unknownPriceRequests > 0) add("${s.unknownPriceRequests} 次价格未知")
         }
         if (notes.isNotEmpty()) addView(text(notes.joinToString(" · "), 11f, Color.parseColor("#D97706"))
@@ -149,10 +152,12 @@ class ApiUsageActivity : AppCompatActivity() {
             "价格未知" else formatMoney(b.costCny)
         row.addView(text(costLabel, 16f, ink, true))
         addView(row)
-        addView(text("${b.requests} 次 · 输入 ${formatTokens(b.inputTokens)} · 输出 ${formatTokens(b.outputTokens)}",
+        val inputLabel = if (b.unknownTokenRequests > 0) "已知输入" else "输入"
+        addView(text("${b.requests} 次 · ${inputLabel} ${formatTokens(b.inputTokens)} · 输出 ${formatTokens(b.outputTokens)}",
             11.5f, sub).apply { setPadding(0, dp(7), 0, 0) })
         val notes = buildList {
             if (b.estimatedRequests > 0) add("${b.estimatedRequests} 次 token 估算")
+            if (b.unknownTokenRequests > 0) add("${b.unknownTokenRequests} 次图片 token 未知")
             if (b.unknownPriceRequests > 0) add("${b.unknownPriceRequests} 次价格未知")
         }
         if (notes.isNotEmpty()) addView(text(notes.joinToString(" · "), 10.5f, Color.parseColor("#D97706")))

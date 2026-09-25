@@ -35,11 +35,14 @@ Ultimate 版在原项目基础上增加：
 
 ### 推荐方式：GitHub Actions APK
 
-进入仓库的 **Actions → Build Android Debug APK**，打开最新成功的运行记录，下载：
+直接打开我的构建入口：
 
-`jev-ultimate-debug`
+- [Build Android Debug APK（测试版）](https://github.com/kitzhn/jev-chat-jarvis/actions/workflows/build-debug.yml)
+- [Build Signed Ultimate Release（正式分发版）](https://github.com/kitzhn/jev-chat-jarvis/actions/workflows/build-release.yml)
 
-解压后安装 APK。
+打开最新成功的运行记录，在 **Artifacts** 下载 `jev-ultimate-debug` 或 `jev-ultimate-release`，解压后安装 APK。
+
+**Debug 版只建议自己测试。** 需要长期发给朋友、覆盖升级并保留数据时，请使用固定签名 Release。
 
 Ultimate Debug 版使用独立 application id：
 
@@ -127,7 +130,9 @@ Android 最低版本：Android 11（API 30）。
 1. 在回复接口填写 DeepSeek API Key。
 2. Base URL 应为 `https://api.deepseek.com/v1`。
 3. 模型默认 `deepseek-flash`。
-4. 点击“测试回复”。
+4. **“DeepSeek 官方：启用 thinking（高级）”默认关闭。** Jev 的短回复与视觉/OCR通常不需要额外推理，因此默认显式发送 `thinking.type=disabled`。
+5. 如果确实需要推理，可打开该高级开关；此时回复和视觉/OCR共用这个设置，并且程序不会发送 `temperature`，因为 DeepSeek thinking 模式下该参数不生效。
+6. 点击“测试回复”。
 
 判断接口仍保持原来的 Jev 配置。
 
@@ -547,7 +552,7 @@ Jev 先根据当前对话给四条候选排序；随后 App 在本地读取用�
 
 推荐你只分享：
 
-1. APK
+1. **固定签名的 Release APK**（Debug 仅用于自己测试）
 2. 本说明书
 3. 不含密钥的 API 配置 JSON
 
@@ -649,9 +654,9 @@ Ultimate Debug 版本名：
 
 ## 25. 固定签名与长期更新
 
-如果只是自己试用，Actions 里的 Debug APK 已经可以直接安装。
+如果只是自己试用，Actions 里的 Debug APK 可以直接安装。当前 Debug 构建还包含仅供模拟器回归使用的导出测试控件，因此**不要把 Debug 当成朋友长期使用的正式分发包**。
 
-如果要长期发给朋友并且以后希望“直接覆盖升级、不丢本地数据”，建议使用固定 Release 签名。
+如果要长期发给朋友并且以后希望“直接覆盖升级、不丢本地数据”，请使用固定 Release 签名。
 
 仓库已经提供手动工作流：
 
@@ -730,7 +735,13 @@ Contact
 
 如果模型响应里有标准 `usage.prompt_tokens` / `completion_tokens`，优先使用真实值。
 
-如果服务商没有返回 usage，则根据请求与响应文本长度做本地估算，并在仪表盘标记“token 估算”。
+文本接口没有返回 usage 时，会根据请求与响应文本长度做本地估算，并在仪表盘标记“token 估算”。
+
+**视觉接口例外：** 如果服务商没有返回图片 prompt token，程序会把图片输入 token 标记为“未知”，不会再用 Base64 图片字符串长度去猜计费 token；因此对应费用也可能显示为未知。
+
+明细最多保留最近 5000 条。超过上限的旧明细会合并为按日 / 接口 / 模型汇总（保留约 400 天），所以高频使用也不会因为明细上限而漏掉当月前半段的请求与费用。
+
+统计文件中的 Base URL 只保留 scheme、host、port 和 path；URL userinfo、query、fragment 会在写入前移除，避免把误放在 URL 中的 token 写入统计文件。
 
 费用为本地估算，最终扣费以服务商账单为准。
 
