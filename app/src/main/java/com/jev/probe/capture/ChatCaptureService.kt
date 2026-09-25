@@ -403,6 +403,8 @@ open class ChatCaptureService : AccessibilityService() {
         return snapshot
     }
 
+    // REVIEW(MAJOR-01): async judgment/reply callbacks are not generation-scoped.
+    // See docs/CODE_REVIEW_2026-09-25.md. Do not change without owner approval.
     private fun runAnalysis() {
         val snapshot = pendingSnapshot ?: return
         if (analyzing) return
