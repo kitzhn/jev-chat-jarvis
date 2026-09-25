@@ -20,9 +20,9 @@ import com.jev.probe.core.Msg
  *                       adapter names below what proves "we are in a chat".
  * - messages non-empty→ normal capture.
  *
- * The disguised accessibility service (registered as SelectToSpeakService) lets
- * us read the node tree of apps that obfuscate it for normal services (WeChat).
- * Feishu/Lark does not obfuscate, so its adapter reads plain resource-ids.
+ * Dedicated adapters are used only where the target app exposes ordinary
+ * accessibility content. WeChat deliberately uses the separate screenshot/OCR
+ * path in [ChatCaptureService] instead of consuming hidden message nodes.
  */
 interface ChatAppAdapter {
     val pkg: String
@@ -129,61 +129,6 @@ internal fun findWeChatTitle(
         for (i in node.childCount - 1 downTo 0) node.getChild(i)?.let { stack.addLast(it) }
     }
     return bestCounted ?: bestPlain
-}
-
-/** WeChat (com.tencent.mm). Message bubbles carry a stable id; sender side is
- *  the bubble's horizontal position (right = me, left = other).
- *
- *  "In a chat window" = a `id/bkl` bubble container exists (even with its text
- *  stripped by the obfuscation) — nothing else counts, so a list screen's
- *  editable search box can no longer pass for a chat window (v1.3 fix: it was
- *  triggering OCR fallback on the conversation list). WeChat 8.0.52+ hides
- *  node text from ordinary services, so an empty read here (a `bkl` with no
- *  text) is exactly the case OCR fallback exists for. */
-class WeChatAdapter : ChatAppAdapter {
-    override val pkg = "com.tencent.mm"
-
-    override fun extract(root: AccessibilityNodeInfo, res: Resources): ChatSnapshot? {
-        val width = res.displayMetrics.widthPixels
-        val bubbles = ArrayList<Triple<Int, Int, String>>() // top, centerX, text
-        var firstBubbleTop = Int.MAX_VALUE
-        var isChat = false
-
-        val stack = ArrayDeque<AccessibilityNodeInfo>()
-        stack.addLast(root)
-        var guard = 0
-        while (stack.isNotEmpty() && guard < 5000) {
-            guard++
-            val node = stack.removeLast()
-            val id = node.viewIdResourceName
-            val text = node.text?.toString()
-            if (id == BUBBLE_ID) {
-                isChat = true
-                if (!text.isNullOrBlank()) {
-                    val b = Rect(); node.getBoundsInScreen(b)
-                    bubbles.add(Triple(b.top, b.centerX(), text))
-                    if (b.top < firstBubbleTop) firstBubbleTop = b.top
-                }
-            }
-            for (i in node.childCount - 1 downTo 0) node.getChild(i)?.let { stack.addLast(it) }
-        }
-        val title = findWeChatTitle(root, firstBubbleTop, width, res)
-        // In a chat but nothing readable → empty snapshot, the OCR fallback cue.
-        if (bubbles.isEmpty()) return if (isChat) ChatSnapshot(title, emptyList()) else null
-        bubbles.sortBy { it.first }
-        val msgs = bubbles.map { (_, cx, text) ->
-            Msg(if (cx > width / 2) "me" else "other", text)
-        }
-        return ChatSnapshot(
-            title,
-            msgs,
-            conversationKind = if (isLikelyGroupTitle(title)) "group" else "direct"
-        )
-    }
-
-    companion object {
-        private const val BUBBLE_ID = "com.tencent.mm:id/bkl"
-    }
 }
 
 /**
