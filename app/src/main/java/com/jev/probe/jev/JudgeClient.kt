@@ -84,7 +84,7 @@ class JudgeClient(private val prefs: Prefs) {
         return try {
             send(JevQuestions.buildState(snapshot, relationship, background, history), questions)
         } catch (e: ApiException) {
-            if (enriched && e.status != null && e.status in 400..499) {
+            if (enriched && (e.status == 400 || e.status == 422)) {
                 Log.w(TAG, "judge HTTP ${e.status} with background/history; retrying plain")
                 send(JevQuestions.buildState(snapshot, relationship), questions)
             } else throw e
