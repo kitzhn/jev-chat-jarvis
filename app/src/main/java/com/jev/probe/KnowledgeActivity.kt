@@ -487,7 +487,7 @@ class KnowledgeActivity : AppCompatActivity() {
             minLines = 2; gravity = Gravity.TOP
         }
         val identityEdit = multiEdit(
-            existing?.identities?.joinToString("\n") {
+            existing?.identities?.filter { it.scope.isBlank() }?.joinToString("\n") {
                 "${identityLabel(it.app)} | ${it.title}"
             } ?: "",
             "每行一个，例如：QQ | 昵称\n飞书 | 姓名\nX | @handle"
@@ -511,6 +511,14 @@ class KnowledgeActivity : AppCompatActivity() {
             "推荐使用“平台 | 会话标题”。同一个现实联系人可以绑定多个 App；匹配时优先使用这组精确身份。",
             11f, sub))
         box.addView(identityEdit)
+        existing?.identities?.filter { it.scope.isNotBlank() }?.takeIf { it.isNotEmpty() }?.let { scoped ->
+            box.addView(text(
+                "群内身份（自动保留）：\n" + scoped.joinToString("\n") {
+                    "${identityLabel(it.app)} | ${it.title} @ ${it.scope}"
+                },
+                11f, sub
+            ).apply { setPadding(0, dp(5), 0, 0) })
+        }
         box.addView(label("旧式全局别名")); box.addView(aliasEdit)
         box.addView(label("关系类型")); box.addView(relEdit)
         box.addView(label("关系阶段")); box.addView(stageEdit)
@@ -535,7 +543,11 @@ class KnowledgeActivity : AppCompatActivity() {
             .setPositiveButton("保存") { _, _ ->
                 val name = nameEdit.text.toString().trim()
                 if (name.isBlank()) { toast("名字不能空"); return@setPositiveButton }
-                val identities = parseIdentityLines(identityEdit.text.toString())
+                val globalIdentities = parseIdentityLines(identityEdit.text.toString())
+                val scopedIdentities = existing?.identities?.filter { it.scope.isNotBlank() }.orEmpty()
+                val identities = (globalIdentities + scopedIdentities).distinctBy {
+                    it.app + "\u0000" + KbStore.normalizeName(it.scope) + "\u0000" + KbStore.normalizeName(it.title)
+                }
                 val updated = Contact(
                     id = existing?.id ?: KbStore.newId(),
                     name = name,
@@ -554,6 +566,7 @@ class KnowledgeActivity : AppCompatActivity() {
                     communicationStyle = communicationEdit.text.toString().trim(),
                     boundaries = boundariesEdit.text.toString().trim(),
                     notes = notesEdit.text.toString().trim(),
+                    strategySelections = existing?.strategySelections ?: emptyMap(),
                     autoSummary = existing?.autoSummary ?: ""
                 )
                 if (existing == null) store.saveContact(updated)
