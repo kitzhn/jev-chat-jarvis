@@ -24,7 +24,8 @@ class ReplyClient(private val prefs: Prefs) {
      */
     fun draft(snapshot: ChatSnapshot, relationship: String, ctx: ChatContext? = null): List<ReplyDraft> {
         val convo = snapshot.messages.takeLast(10).joinToString("\n") {
-            (if (it.side == "me") "我" else "对方") + "：" + it.text
+            val who = if (it.side == "me") "我" else (it.speaker?.takeIf { s -> s.isNotBlank() } ?: "对方")
+            who + "：" + it.text
         }
         val sys = "你是中文即时通讯回复助手。只输出一个 JSON 数组，含且仅含 4 条候选回复文本，" +
             "四条要明显对应不同策略：1) 温柔承接；2) 轻松自然；3) 稳妥克制；4) 主动推进。"+
@@ -57,7 +58,8 @@ class ReplyClient(private val prefs: Prefs) {
         if (history.isNotEmpty()) {
             sb.append("\n更早的聊天记录（越靠下越新）：\n")
             history.takeLast(prefs.contextHistoryCount.coerceIn(0, 100)).forEach {
-                sb.append(if (it.side == "me") "我：" else "对方：").append(it.text).append('\n')
+                val who = if (it.side == "me") "我" else (it.speaker?.takeIf { s -> s.isNotBlank() } ?: "对方")
+                sb.append(who).append("：").append(it.text).append('\n')
             }
         }
         sb.append('\n')
