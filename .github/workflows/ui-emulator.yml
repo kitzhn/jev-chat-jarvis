@@ -1,41 +1,40 @@
-name: Capture Ultimate Emulator UI
-
-concurrency:
-  group: ui-emulator-${{ github.ref }}
-  cancel-in-progress: true
+name: Android 15 Emulator Regression
 
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - ".github/workflows/ui-emulator.yml"
-      - ".github/scripts/capture-ui.sh"
-      - "app/src/main/java/com/jev/probe/KnowledgeActivity.kt"
-      - "app/src/main/java/com/jev/probe/ui/RelationshipGraphView.kt"
-      - "app/src/main/java/com/jev/probe/overlay/OverlayController.kt"
-      - "app/src/main/java/com/jev/probe/capture/ChatCaptureService.kt"
-      - "app/src/main/java/com/jev/probe/capture/ChatAppAdapter.kt"
-      - "app/src/main/java/com/jev/probe/capture/WeChatNotificationBridge.kt"
-      - "app/src/main/java/com/jev/probe/capture/WeChatNotificationListener.kt"
-      - "app/src/main/java/com/jev/probe/capture/ocr/OcrChatGrouper.kt"
-      - "app/src/main/java/com/jev/probe/jev/JevClient.kt"
-      - "app/src/main/java/com/jev/probe/jev/ConversationSceneDetector.kt"
-      - "app/src/main/java/com/jev/probe/jev/RelationshipStrategyPolicy.kt"
-      - "app/src/main/java/com/jev/probe/core/ChatModels.kt"
-      - "app/src/main/java/com/jev/probe/core/Prefs.kt"
-      - "app/src/main/java/com/jev/probe/core/kb/KbModels.kt"
-      - "app/src/main/java/com/jev/probe/core/kb/KbStore.kt"
-      - "app/src/main/java/com/jev/probe/core/kb/ContextBuilder.kt"
-      - "app/src/main/AndroidManifest.xml"
-      - "app/src/main/java/com/jev/probe/SettingsActivity.kt"
-      - "app/src/debug/**"
   workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "app/**"
+      - "integration-fixture/**"
+      - "build.gradle.kts"
+      - "settings.gradle.kts"
+      - "gradle/**"
+      - "gradle.properties"
+      - ".github/scripts/capture-ui.sh"
+      - ".github/workflows/ui-emulator.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "app/**"
+      - "integration-fixture/**"
+      - "build.gradle.kts"
+      - "settings.gradle.kts"
+      - "gradle/**"
+      - "gradle.properties"
+      - ".github/scripts/capture-ui.sh"
+      - ".github/workflows/ui-emulator.yml"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  screenshot:
+  emulator:
     runs-on: ubuntu-latest
-    timeout-minutes: 35
+    timeout-minutes: 40
+    env:
+      JEV_ABI: x86_64
 
     steps:
       - name: Checkout
@@ -54,23 +53,12 @@ jobs:
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
 
-      - name: Build x86_64 debug APK for emulator
+      - name: Build Jev and messenger fixtures
         run: |
-          sed -i 's/abiFilters += listOf("arm64-v8a")/abiFilters += listOf("x86_64")/' app/build.gradle.kts
-          python3 - <<'PY'
-          from pathlib import Path
-          p = Path("app/src/main/AndroidManifest.xml")
-          s = p.read_text()
-          s = s.replace('android:name=".SettingsActivity"\n            android:exported="false"',
-                        'android:name=".SettingsActivity"\n            android:exported="true"')
-          s = s.replace('android:name=".KnowledgeActivity"\n            android:exported="false"',
-                        'android:name=".KnowledgeActivity"\n            android:exported="true"')
-          p.write_text(s)
-          PY
           chmod +x ./gradlew
-          ./gradlew assembleDebug --stacktrace
+          ./gradlew             :app:assembleDebug             :integration-fixture:assembleQqDebug             :integration-fixture:assembleWechatDebug             --stacktrace
 
-      - name: Run emulator and capture screenshots
+      - name: Run Android 15 integration regression
         uses: reactivecircus/android-emulator-runner@v2
         with:
           api-level: 35
@@ -81,10 +69,13 @@ jobs:
           disable-animations: true
           script: bash .github/scripts/capture-ui.sh
 
-      - name: Upload UI screenshots
+      - name: Upload emulator evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: jev-ultimate-emulator-screenshots
-          path: screenshots/*.png
+          name: jev-ultimate-emulator-evidence
+          path: |
+            screenshots/*.png
+            integration-results/*.txt
           if-no-files-found: error
+          retention-days: 30
