@@ -181,7 +181,8 @@ data class ChatContext(
                         "com.twitter.android" -> "X"
                         else -> identity.label.ifBlank { identity.app }
                     }
-                    "${appName}:${identity.title}"
+                    val scope = identity.scope.takeIf { it.isNotBlank() }?.let { "@$it" }.orEmpty()
+                    "${appName}:${identity.title}${scope}"
                 }).append('\n')
             if (c.profileTags.isNotEmpty()) sb.append("画像标签：")
                 .append(c.profileTags.joinToString("、")).append('\n')
