@@ -26,7 +26,9 @@
 > - [Debug 测试版](https://github.com/kitzhn/jev-chat-jarvis/actions/workflows/build-debug.yml) — 打开最新成功运行，在 **Artifacts** 下载 `jev-ultimate-debug`。  
 > - [Android 15 模拟器验证与截图](https://github.com/kitzhn/jev-chat-jarvis/actions/workflows/ui-emulator.yml) — 最新成功运行的 **Artifacts** 中下载 `jev-ultimate-emulator-evidence`。  
 >
-> 正式发布工作流会读取 App 的 `versionName` 生成版本标签（例如 `v2.4.0`），并将签名 APK 以固定文件名 `jev-ultimate-arm64.apk` 发布到 GitHub Releases，同时附带 SHA-256 校验文件。因此“直接下载最新 APK”链接可以长期保持不变。
+> 正式发布工作流会读取 App 的 `versionName` 生成版本标签（例如 `v2.4.0`），并将签名 APK 以固定文件名 `jev-ultimate-arm64.apk` 发布到 GitHub Releases，同时附带 SHA-256 校验文件。因此“直接下载最新 APK”链接可以长期保持不变。  
+>
+> **首次正式发布前只需配置一次签名：** 仓库 Settings → Secrets and variables → Actions 中添加 `JEV_KEYSTORE_B64`、`JEV_STORE_PASSWORD`、`JEV_KEY_ALIAS`、`JEV_KEY_PASSWORD`。之后进入 [Build Signed Ultimate Release](https://github.com/kitzhn/jev-chat-jarvis/actions/workflows/build-release.yml) 点 **Run workflow** 即可更新正式版；README 的下载地址无需再修改。
 >
 > 给朋友使用请先看：[**Jev Ultimate 中文使用说明书**](docs/USER_GUIDE_ZH.md)  
 > OpenRouter 无密钥配置示例：[docs/api-config-openrouter.example.json](docs/api-config-openrouter.example.json) · [代码审阅记录](docs/CODE_REVIEW_2026-09-25.md)
