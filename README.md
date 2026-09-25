@@ -12,7 +12,7 @@
 [![Android](https://img.shields.io/badge/Android-11%2B-3DDC84?style=flat-square&logo=android&logoColor=white)](#快速开始)
 [![License](https://img.shields.io/github/license/jev-chat/jev-chat-jarvis?style=flat-square)](LICENSE)
 
-[官网](https://chatjevs.com) · [Ultimate 下载](https://github.com/kitzhn/jev-chat-jarvis/actions/workflows/build-debug.yml) · [上游历史版本](https://github.com/jev-chat/jev-chat-jarvis/releases) · [更新日志](CHANGELOG.md) · [macOS 版](https://github.com/jev-chat/jev-chat-mac) · [Windows 版](https://github.com/jev-chat/jev-chat-windows)
+[官网](https://chatjevs.com) · [正式版下载](https://github.com/kitzhn/jev-chat-jarvis/releases/latest) · [直接下载 APK](https://github.com/kitzhn/jev-chat-jarvis/releases/latest/download/jev-ultimate-arm64.apk) · [测试版](https://github.com/kitzhn/jev-chat-jarvis/actions/workflows/build-debug.yml) · [更新日志](CHANGELOG.md) · [macOS 版](https://github.com/jev-chat/jev-chat-mac) · [Windows 版](https://github.com/jev-chat/jev-chat-windows)
 
 </div>
 
@@ -21,11 +21,12 @@
 > 本 Fork 当前为 **Jev Ultimate 2.4**：在上游基础上增加了 **跨 App / 群聊人物身份、联系人画像、好感/信任/亲密模型、科幻关系节点图、GalGame 四策略回复、画像 + 用户选择习惯 + 对话场景自适应排序、微信实验通知触发 OCR、显式重复联系人合并、API 消耗仪表盘、API 快速方案以及无密钥配置导入/导出**。
 >
 > **我的下载入口（kitzhn/jev-chat-jarvis）：**  
-> - [下载 Debug 测试版](https://github.com/kitzhn/jev-chat-jarvis/actions/workflows/build-debug.yml) — 打开最新成功运行，在 **Artifacts** 下载 `jev-ultimate-debug`。  
-> - [下载签名 Release 正式版](https://github.com/kitzhn/jev-chat-jarvis/actions/workflows/build-release.yml) — 打开最新成功运行，在 **Artifacts** 下载 `jev-ultimate-release`。  
-> - [查看 Android 15 模拟器验证与截图](https://github.com/kitzhn/jev-chat-jarvis/actions/workflows/ui-emulator.yml) — 最新成功运行的 **Artifacts** 中下载 `jev-ultimate-emulator-evidence`。  
+> - **[正式版下载页（推荐）](https://github.com/kitzhn/jev-chat-jarvis/releases/latest)** — 永远跳到当前最新正式 Release。  
+> - **[直接下载最新 APK](https://github.com/kitzhn/jev-chat-jarvis/releases/latest/download/jev-ultimate-arm64.apk)** — 固定直链，可收藏；以后更新版本无需改链接。  
+> - [Debug 测试版](https://github.com/kitzhn/jev-chat-jarvis/actions/workflows/build-debug.yml) — 打开最新成功运行，在 **Artifacts** 下载 `jev-ultimate-debug`。  
+> - [Android 15 模拟器验证与截图](https://github.com/kitzhn/jev-chat-jarvis/actions/workflows/ui-emulator.yml) — 最新成功运行的 **Artifacts** 中下载 `jev-ultimate-emulator-evidence`。  
 >
-> **建议：** 自己测试用 Debug；给朋友长期安装请优先使用固定签名 Release。GitHub Actions Artifact 没有稳定的“永远指向最新 APK”的匿名直链，因此这里保留稳定的工作流下载入口，避免 README 链接随每次构建失效。
+> 正式发布工作流会读取 App 的 `versionName` 生成版本标签（例如 `v2.4.0`），并将签名 APK 以固定文件名 `jev-ultimate-arm64.apk` 发布到 GitHub Releases，同时附带 SHA-256 校验文件。因此“直接下载最新 APK”链接可以长期保持不变。
 >
 > 给朋友使用请先看：[**Jev Ultimate 中文使用说明书**](docs/USER_GUIDE_ZH.md)  
 > OpenRouter 无密钥配置示例：[docs/api-config-openrouter.example.json](docs/api-config-openrouter.example.json) · [代码审阅记录](docs/CODE_REVIEW_2026-09-25.md)
@@ -90,10 +91,11 @@
 
 ## 快速开始
 
-**1. 装包。** Ultimate 版请优先从本 Fork 的 GitHub Actions 下载，而不是安装仓库里保留的上游 v1.4 APK：
+**1. 装包。** Ultimate 正式版请优先使用 GitHub Releases：
 
+- **正式版（推荐）：** [最新 Release 页面](https://github.com/kitzhn/jev-chat-jarvis/releases/latest)。
+- **一键直下 APK：** [jev-ultimate-arm64.apk](https://github.com/kitzhn/jev-chat-jarvis/releases/latest/download/jev-ultimate-arm64.apk)。
 - **自己测试：** [Build Android Debug APK](https://github.com/kitzhn/jev-chat-jarvis/actions/workflows/build-debug.yml) → 打开最新成功运行 → Artifacts → `jev-ultimate-debug`。
-- **长期安装 / 给朋友：** [Build Signed Ultimate Release](https://github.com/kitzhn/jev-chat-jarvis/actions/workflows/build-release.yml) → Artifacts → `jev-ultimate-release`。
 - **模拟器验证截图：** [Android 15 Emulator Regression](https://github.com/kitzhn/jev-chat-jarvis/actions/workflows/ui-emulator.yml) → Artifacts → `jev-ultimate-emulator-evidence`。
 
 Android 11+，当前构建面向 ARM64 / `arm64-v8a`。Debug 与 Release 签名不同，互相切换时可能需要先卸载旧包。
