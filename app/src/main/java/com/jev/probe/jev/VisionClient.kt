@@ -52,6 +52,9 @@ class VisionClient(private val prefs: Prefs) {
             .put("model", prefs.visionModel)
             .put("messages", messages)
             .put("temperature", 0.0)
+        if (url.contains("openrouter.ai", ignoreCase = true)) {
+            body.put("usage", JSONObject().put("include", true))
+        }
         val resp = HttpJson.post(url, prefs.effectiveVisionKey(), body, Route.VISION, HttpJson.headersFor(url))
         val contentText = resp.optJSONArray("choices")?.optJSONObject(0)
             ?.optJSONObject("message")?.optString("content") ?: ""
