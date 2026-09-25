@@ -20,8 +20,12 @@
 >
 > 本 Fork 当前为 **Jev Ultimate 2.4**：在上游基础上增加了 **跨 App / 群聊人物身份、联系人画像、好感/信任/亲密模型、科幻关系节点图、GalGame 四策略回复、画像 + 用户选择习惯 + 对话场景自适应排序、微信实验通知触发 OCR、显式重复联系人合并、API 消耗仪表盘、API 快速方案以及无密钥配置导入/导出**。
 >
-> **我的下载入口：** [Debug 测试版构建](https://github.com/kitzhn/jev-chat-jarvis/actions/workflows/build-debug.yml) · [签名 Release 正式版构建](https://github.com/kitzhn/jev-chat-jarvis/actions/workflows/build-release.yml)  
-> 打开最新成功的运行记录，在 **Artifacts** 下载 `jev-ultimate-debug` 或 `jev-ultimate-release`。Debug 版只用于自己测试；长期分发给朋友请使用固定签名的 Release。
+> **我的下载入口（kitzhn/jev-chat-jarvis）：**  
+> - [下载 Debug 测试版](https://github.com/kitzhn/jev-chat-jarvis/actions/workflows/build-debug.yml) — 打开最新成功运行，在 **Artifacts** 下载 `jev-ultimate-debug`。  
+> - [下载签名 Release 正式版](https://github.com/kitzhn/jev-chat-jarvis/actions/workflows/build-release.yml) — 打开最新成功运行，在 **Artifacts** 下载 `jev-ultimate-release`。  
+> - [查看 Android 15 模拟器验证与截图](https://github.com/kitzhn/jev-chat-jarvis/actions/workflows/ui-emulator.yml) — 最新成功运行的 **Artifacts** 中下载 `jev-ultimate-emulator-evidence`。  
+>
+> **建议：** 自己测试用 Debug；给朋友长期安装请优先使用固定签名 Release。GitHub Actions Artifact 没有稳定的“永远指向最新 APK”的匿名直链，因此这里保留稳定的工作流下载入口，避免 README 链接随每次构建失效。
 >
 > 给朋友使用请先看：[**Jev Ultimate 中文使用说明书**](docs/USER_GUIDE_ZH.md)  
 > OpenRouter 无密钥配置示例：[docs/api-config-openrouter.example.json](docs/api-config-openrouter.example.json) · [代码审阅记录](docs/CODE_REVIEW_2026-09-25.md)
@@ -240,7 +244,8 @@ JDK 17 + Android SDK（platform 35 / build-tools 35）。
 ./gradlew :app:assembleDebug      # app/build/outputs/apk/debug/app-debug.apk
 ./gradlew :app:assembleRelease    # 需要仓库外的签名 properties，路径由 JEV_KEYSTORE_PROPS 指定
 
-# 仅 CI / 集成回归需要 QQ、微信夹具：
+# 仅 CI / 集成回归需要 QQ、微信夹具。
+# integration-fixture 只有在这个环境变量为 1 时才会进入根 Gradle Project：
 JEV_INTEGRATION_FIXTURES=1 ./gradlew :app:assembleDebug :integration-fixture:assembleQqDebug :integration-fixture:assembleWechatDebug
 ```
 
