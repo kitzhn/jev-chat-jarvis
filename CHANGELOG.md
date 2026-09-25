@@ -2,6 +2,27 @@
 
 格式：每版按 新增 / 改进 / 修复 / 已知限制 / 下载 归类，人话版，不是提交列表。
 
+## v2.4.0 Ultimate — 2026-09-25
+
+**新增**
+- 新增“API 消耗仪表盘”：显示今日/本月调用次数、输入/输出 token、缓存命中 token、人民币预计费用，并按接口与模型拆分。
+- API 响应带 usage 时优先记录真实 prompt/completion token；缺失 usage 时使用本地字符估算并明确标记为估算。
+- 未知/自定义模型价格不会被误显示成免费：仍统计 token，并标记“价格未知”。
+- 判断、回复、视觉三路 API 均接入本地 usage 计量；统计文件不保存聊天正文、Prompt 或 API Key。
+- DeepSeek 官方回复预设升级为 `deepseek-flash`（V4.1 Flash）。
+- OpenRouter 默认回复模型升级为 `deepseek/deepseek-v4.1-flash`。
+- DeepSeek V4.1 Flash 已支持原生图片输入，视觉接口新增 DeepSeek 官方预设。
+- 首页和设置页增加 API 消耗仪表盘入口。
+
+**费用估算**
+- DeepSeek 官方 `deepseek-flash` 按北京时间峰谷价和缓存命中/未命中 token 估算。
+- OpenRouter Jev 1.13 与 DeepSeek V4.1 Flash 使用当前公开价；如果 OpenRouter 响应直接提供 cost，则优先使用返回值。
+- OpenRouter 美元费用按本地参考汇率约 1 USD = 6.71 CNY 换算；最终账单仍以服务商为准。
+
+**隐私**
+- usage 统计只记录时间、接口、模型、token、估算费用和是否为估算值。
+- 不记录请求正文、聊天文本或 API Key。
+
 ## v2.3.0 Ultimate — 2026-09-25
 
 **新增**
