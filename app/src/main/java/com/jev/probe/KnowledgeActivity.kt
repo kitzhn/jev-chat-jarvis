@@ -398,6 +398,14 @@ class KnowledgeActivity : AppCompatActivity() {
             setPadding(0, dp(7), 0, 0)
         }
         tools.addView(miniAction("查看好感记录") { showRelationshipHistory(c0) })
+        if (strategyTotal > 0) {
+            tools.addView(miniAction("重置回复习惯", danger = true) {
+                confirm("重置回复习惯", "清空「${c0.name}」的 $strategyTotal 次 GalGame 策略选择记录？不会改好感、信任或亲密度。") {
+                    store.clearStrategySelections(c0.id)
+                    render()
+                }
+            })
+        }
         val logN = store.logSize(c0.id)
         tools.addView(miniAction("清空历史（$logN）", danger = true) {
             if (logN == 0) { toast("本来就没有历史") }
