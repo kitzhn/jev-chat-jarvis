@@ -19,7 +19,7 @@ import com.jev.probe.core.kb.KbStore
 import com.jev.probe.jev.ConversationSceneDetector
 import com.jev.probe.jev.RelationshipStrategyPolicy
 
-/** Debug-only 2.3 integration proof. Never packaged in release builds. */
+/** Debug-only 2.4 integration proof. Never packaged in release builds. */
 class AdaptiveModelDemoActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -96,7 +96,7 @@ class AdaptiveModelDemoActivity : AppCompatActivity() {
             setPadding(40, 58, 40, 48)
             setBackgroundColor(Color.parseColor("#071226"))
         }
-        root.addView(label("JEV ULTIMATE 2.3 · ADAPTIVE CORE", 20f, "#7EE7FF", true))
+        root.addView(label("JEV ULTIMATE 2.4 · ADAPTIVE CORE", 20f, "#7EE7FF", true))
         root.addView(label(
             "群聊人物模型 × 用户策略学习 × 对话场景 × 微信通知触发",
             12f, "#A8C5DF", false

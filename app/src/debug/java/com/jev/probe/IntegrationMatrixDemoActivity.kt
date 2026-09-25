@@ -23,8 +23,8 @@ import com.jev.probe.core.kb.PlatformIdentity
 import com.jev.probe.jev.ConversationSceneDetector
 import com.jev.probe.jev.RelationshipStrategyPolicy
 
-/** Debug-only deterministic integration matrix for v2.3 features. */
-class V23FeatureDemoActivity : AppCompatActivity() {
+/** Debug-only deterministic integration matrix for v2.4 features. */
+class IntegrationMatrixDemoActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -105,7 +105,7 @@ class V23FeatureDemoActivity : AppCompatActivity() {
             setPadding(36, 46, 36, 40)
             setBackgroundColor(Color.parseColor("#071226"))
         }
-        root.addView(label("JEV ULTIMATE 2.3 · INTEGRATION MATRIX", 19f, "#7EE7FF", true))
+        root.addView(label("JEV ULTIMATE 2.4 · INTEGRATION MATRIX", 19f, "#7EE7FF", true))
         root.addView(label("四个新增链路使用虚构演示数据，不包含任何个人内容", 11.5f, "#A8C5DF"))
 
         root.addView(card(
