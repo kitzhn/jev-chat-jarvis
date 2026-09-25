@@ -470,7 +470,9 @@ class KbStore private constructor(context: Context) {
             return "已存为联系人「${display}」"
         }
         val alreadyLinked = existing.identities.any {
-            it.app == app && normalizeName(it.title) == normalizeName(display)
+            it.app == app &&
+                it.scope.isBlank() &&
+                normalizeName(it.title) == normalizeName(display)
         }
         if (alreadyLinked) return "联系人「${existing.name}」已关联当前会话"
         linkIdentity(existing.id, app, display)
