@@ -208,26 +208,37 @@ class KbStore private constructor(context: Context) {
         saveContact(current.copy(strategySelections = next))
     }
 
-    fun linkIdentity(contactId: String, app: String, title: String, label: String = ""): Boolean = synchronized(lock) {
+    fun linkIdentity(
+        contactId: String,
+        app: String,
+        title: String,
+        label: String = "",
+        scope: String = ""
+    ): Boolean = synchronized(lock) {
         val contact = loadContacts().firstOrNull { it.id == contactId } ?: return@synchronized false
         val cleanTitle = displayName(title)
         if (cleanTitle.isBlank()) return@synchronized false
         val cleanApp = app.trim()
+        val cleanScope = displayName(scope)
         val exists = contact.identities.any {
-            it.app == cleanApp && normalizeName(it.title) == normalizeName(cleanTitle)
+            it.app == cleanApp &&
+                normalizeName(it.scope) == normalizeName(cleanScope) &&
+                normalizeName(it.title) == normalizeName(cleanTitle)
         }
         val identities = if (exists) contact.identities else
-            contact.identities + PlatformIdentity(cleanApp, cleanTitle, label.trim())
+            contact.identities + PlatformIdentity(cleanApp, cleanTitle, label.trim(), cleanScope)
         val apps = if (cleanApp.isBlank() || cleanApp in contact.apps) contact.apps else contact.apps + cleanApp
         val aliases = if ((listOf(contact.name) + contact.aliases).any { normalizeName(it) == normalizeName(cleanTitle) })
             contact.aliases else contact.aliases + cleanTitle
         saveContact(contact.copy(identities = identities, apps = apps, aliases = aliases))
     }
 
-    fun unlinkIdentity(contactId: String, app: String, title: String): Boolean = synchronized(lock) {
+    fun unlinkIdentity(contactId: String, app: String, title: String, scope: String = ""): Boolean = synchronized(lock) {
         val contact = loadContacts().firstOrNull { it.id == contactId } ?: return@synchronized false
         val identities = contact.identities.filterNot {
-            it.app == app && normalizeName(it.title) == normalizeName(title)
+            it.app == app &&
+                normalizeName(it.scope) == normalizeName(scope) &&
+                normalizeName(it.title) == normalizeName(title)
         }
         saveContact(contact.copy(identities = identities))
     }
@@ -237,21 +248,57 @@ class KbStore private constructor(context: Context) {
      * If that exact identity already belongs to another saved contact, merge the
      * duplicate into the selected target first.
      */
-    fun linkCurrentIdentityToContact(targetId: String, app: String, title: String): String = synchronized(lock) {
+    fun linkCurrentIdentityToContact(
+        targetId: String,
+        app: String,
+        title: String,
+        scope: String = ""
+    ): String = synchronized(lock) {
         val target = loadContacts().firstOrNull { it.id == targetId }
             ?: return@synchronized "目标联系人不存在"
         val want = normalizeName(title)
+        val wantScope = normalizeName(scope)
         if (want.isBlank()) return@synchronized "当前会话标题为空"
         val owner = loadContacts().firstOrNull { c ->
-            c.id != targetId && c.identities.any { it.app == app && normalizeName(it.title) == want }
+            c.id != targetId && c.identities.any {
+                it.app == app &&
+                    normalizeName(it.scope) == wantScope &&
+                    normalizeName(it.title) == want
+            }
         }
         if (owner != null && !mergeContacts(targetId, owner.id)) {
             return@synchronized "合并旧联系人失败"
         }
-        return@synchronized if (linkIdentity(targetId, app, title, appLabelForData(app))) {
+        return@synchronized if (linkIdentity(targetId, app, title, appLabelForData(app), scope)) {
             if (owner != null) "已合并「${owner.name}」并关联到「${target.name}」"
             else "已关联到「${target.name}」"
         } else "关联失败"
+    }
+
+    fun findSpeakerContact(speaker: String, app: String, scope: String): Contact? = synchronized(lock) {
+        val wantSpeaker = normalizeName(speaker)
+        val wantScope = normalizeName(scope)
+        if (wantSpeaker.isBlank()) return@synchronized null
+
+        loadContacts().firstOrNull { c ->
+            c.identities.any {
+                it.app == app &&
+                    normalizeName(it.scope) == wantScope &&
+                    normalizeName(it.title) == wantSpeaker
+            }
+        }?.let { return@synchronized it }
+
+        loadContacts().firstOrNull { c ->
+            c.identities.any {
+                it.app == app &&
+                    it.scope.isBlank() &&
+                    normalizeName(it.title) == wantSpeaker
+            }
+        }?.let { return@synchronized it }
+
+        loadContacts().firstOrNull { c ->
+            normalizeName(c.name) == wantSpeaker || c.aliases.any { normalizeName(it) == wantSpeaker }
+        }
     }
 
     private fun mergeContacts(targetId: String, sourceId: String): Boolean {
