@@ -342,7 +342,7 @@ class KbStore private constructor(context: Context) {
 
         val mergedLog = (loadLog(targetId) + loadLog(sourceId))
             .sortedBy { it.ts }
-            .distinctBy { "${it.ts}\u0000${it.side}\u0000${it.app}\u0000${it.text}" }
+            .distinctBy { "${it.ts}\u0000${it.side}\u0000${it.speaker ?: ""}\u0000${it.app}\u0000${it.text}" }
             .takeLast(MAX_LOG)
             .toMutableList()
         if (!writeAtomic(logFile(targetId), logJson(mergedLog))) return false
@@ -501,7 +501,7 @@ class KbStore private constructor(context: Context) {
             val screen = entries.filter { it.text.isNotBlank() }
             if (screen.isEmpty()) return true
             val list = loadLog(contactId)
-            val keys = screen.map { key(it.side, it.text) }
+            val keys = screen.map { key(it.side, it.text, it.speaker) }
             val prev = if (screenBatch) loadLastScreen(contactId) else emptyList()
 
             // Same screen as last time: nothing happened worth recording.
@@ -514,7 +514,7 @@ class KbStore private constructor(context: Context) {
                 var match = true
                 for (i in 0 until cand) {
                     val e = list[list.size - cand + i]
-                    if (key(e.side, e.text) != keys[i]) { match = false; break }
+                    if (key(e.side, e.text, e.speaker) != keys[i]) { match = false; break }
                 }
                 if (match) { k = cand; break }
             }
@@ -729,7 +729,8 @@ class KbStore private constructor(context: Context) {
                     side = o.optString("side", "other"),
                     text = o.optString("text"),
                     ts = o.optLong("ts", 0L),
-                    app = o.optString("app")
+                    app = o.optString("app"),
+                    speaker = o.optString("speaker").takeIf { it.isNotBlank() }
                 ))
             }
         }
@@ -832,7 +833,8 @@ class KbStore private constructor(context: Context) {
                 .put("side", e.side)
                 .put("text", e.text)
                 .put("ts", e.ts)
-                .put("app", e.app))
+                .put("app", e.app)
+                .put("speaker", e.speaker ?: JSONObject.NULL))
         }
         return arr.toString()
     }
@@ -950,7 +952,8 @@ class KbStore private constructor(context: Context) {
         return out
     }
 
-    private fun key(side: String, text: String) = side + "\u0000" + text
+    private fun key(side: String, text: String, speaker: String? = null) =
+        side + "\u0000" + (speaker ?: "") + "\u0000" + text
 
     private fun appLabelForData(pkg: String): String = when (pkg) {
         "com.tencent.mobileqq" -> "QQ"
