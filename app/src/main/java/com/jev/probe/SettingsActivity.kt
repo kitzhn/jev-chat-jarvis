@@ -358,12 +358,20 @@ class SettingsActivity : AppCompatActivity() {
         val autoRow = toggleRow("对方发消息时自动分析", prefs.autoAnalyze)
         card2.addView(autoRow)
         val relationshipWeightRow = toggleRow(
-            "联系人画像参与候选策略排序",
+            "启用自适应候选排序（画像 + 习惯 + 场景）",
             prefs.relationshipStrategyWeighting
         )
         card2.addView(relationshipWeightRow)
         card2.addView(text(
-            "开启后，好感/信任/亲密、沟通偏好和边界只作为本地排序先验，与 Jev 的当前对话判断合并；关闭后完全按 Jev 排名。",
+            "开启后，联系人画像、你过去实际点过的策略和当前对话场景只作为本地小幅先验，与 Jev 当前对话判断合并；关闭后完全按 Jev 排名。",
+            11f, sub))
+        val strategyLearningRow = toggleRow(
+            "学习我的 GalGame 选项习惯（仅本机计数）",
+            prefs.strategyLearningEnabled
+        )
+        card2.addView(strategyLearningRow)
+        card2.addView(text(
+            "只在你主动点选某条候选时给该联系人对应策略 +1；不会自动改好感、信任或亲密度。",
             11f, sub))
 
         // --- OCR 兜底（B 阶段）---
@@ -504,6 +512,7 @@ class SettingsActivity : AppCompatActivity() {
                 .map { it.trim() }.filter { it.isNotEmpty() }.toSet()
             prefs.autoAnalyze = (autoRow.tag as? Boolean) ?: true
             prefs.relationshipStrategyWeighting = (relationshipWeightRow.tag as? Boolean) ?: true
+            prefs.strategyLearningEnabled = (strategyLearningRow.tag as? Boolean) ?: true
             prefs.ocrFallback = (ocrFallbackRow.tag as? Boolean) ?: true
             prefs.ocrAutoAnalyze = (ocrAutoRow.tag as? Boolean) ?: false
             prefs.wechatAutoOcr = (wechatAutoRow.tag as? Boolean) ?: false
