@@ -23,7 +23,13 @@ class Prefs(context: Context, prefsName: String = PREFS_MAIN) {
      * throwaway instances behind the settings test buttons and the KB self-check
      * have nothing to carry over, and used to print one migration line per tap.
      */
-    init { if (prefsName == PREFS_MAIN) { migrateIfNeeded(); unseedBochaDefaultIfUnconfigured() } }
+    init {
+        if (prefsName == PREFS_MAIN) {
+            migrateIfNeeded()
+            unseedBochaDefaultIfUnconfigured()
+            migrateModelsV24()
+        }
+    }
 
     /**
      * v1.2 -> v1.3: the single `openrouter_key` becomes the judge route's key.
@@ -67,6 +73,23 @@ class Prefs(context: Context, prefsName: String = PREFS_MAIN) {
         if (prov == PROVIDER_BOCHA && key.isBlank()) {
             e.remove(K_JUDGE_PROVIDER).remove(K_JUDGE_BASE).remove(K_JUDGE_MODEL)
             Log.i(TAG, "prefs: reverted auto-seeded bocha default to openrouter")
+        }
+        e.apply()
+    }
+
+    /** v2.4: migrate only known old defaults; never overwrite a custom model. */
+    private fun migrateModelsV24() {
+        if (sp.getBoolean(K_MIGRATED_V24_MODELS, false)) return
+        val e = sp.edit().putBoolean(K_MIGRATED_V24_MODELS, true)
+        val replyBase = sp.getString(K_REPLY_BASE, DEFAULT_REPLY_BASE) ?: DEFAULT_REPLY_BASE
+        val replyModel = sp.getString(K_REPLY_MODEL, "") ?: ""
+        when {
+            replyBase.trimEnd('/') == DEFAULT_REPLY_BASE.trimEnd('/') &&
+                replyModel == "deepseek/deepseek-chat-v3.1" ->
+                e.putString(K_REPLY_MODEL, DEFAULT_REPLY_MODEL)
+            replyBase.trimEnd('/') == DEEPSEEK_BASE.trimEnd('/') &&
+                replyModel == "deepseek-chat" ->
+                e.putString(K_REPLY_MODEL, DEEPSEEK_MODEL)
         }
         e.apply()
     }
@@ -289,6 +312,7 @@ class Prefs(context: Context, prefsName: String = PREFS_MAIN) {
         private const val K_LEGACY_KEY = "openrouter_key"
         private const val K_MIGRATED_V13 = "prefs_migrated_v13"
         private const val K_UNSEEDED_BOCHA = "unseeded_bocha_v141"
+        private const val K_MIGRATED_V24_MODELS = "migrated_v24_models"
         private const val K_JUDGE_PROVIDER = "judge_provider"
         private const val K_JUDGE_BASE = "judge_base_url"
         private const val K_JUDGE_KEY = "judge_key"
