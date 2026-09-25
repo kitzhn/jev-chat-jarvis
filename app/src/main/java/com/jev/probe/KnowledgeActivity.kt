@@ -341,6 +341,25 @@ class KnowledgeActivity : AppCompatActivity() {
             c.addView(text("沟通：" + c0.communicationStyle.replace("\n", " ").take(90), 12f, sub)
                 .apply { setPadding(0, dp(3), 0, 0) })
 
+        val strategyTotal = c0.strategySelections.values.sum()
+        if (strategyTotal > 0) {
+            val names = mapOf(
+                "warm" to "温柔",
+                "playful" to "轻松",
+                "steady" to "稳妥",
+                "proactive" to "主动"
+            )
+            val habit = c0.strategySelections.entries
+                .filter { it.value > 0 }
+                .sortedByDescending { it.value }
+                .joinToString("  ·  ") { (key, count) ->
+                    val pct = (count * 100.0 / strategyTotal).roundToInt()
+                    "${names[key] ?: key} ${pct}%"
+                }
+            c.addView(text("你的回复习惯：$habit（$strategyTotal 次选择）", 11.5f, sub)
+                .apply { setPadding(0, dp(4), 0, 0) })
+        }
+
         val recentEvents = store.relationshipEvents(c0.id, 2)
         if (recentEvents.isNotEmpty()) {
             c.addView(text("最近好感变化", 11.5f, ink, bold = true)
