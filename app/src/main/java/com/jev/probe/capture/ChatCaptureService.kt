@@ -138,6 +138,25 @@ open class ChatCaptureService : AccessibilityService() {
                 }
             }
         }
+        overlay?.onLinkSpeaker = {
+            val snapshot = currentSnapshot
+            val speaker = snapshot?.messages
+                ?.lastOrNull { it.side == "other" && !it.speaker.isNullOrBlank() }
+                ?.speaker
+            val pkg = activePkg ?: foregroundPkg ?: ""
+            when {
+                snapshot?.conversationKind != "group" -> overlay?.toast("当前不是已识别的群聊")
+                speaker.isNullOrBlank() -> overlay?.toast("这一屏没有可靠的发言人昵称")
+                else -> runCatching {
+                    startActivity(Intent(this, KnowledgeActivity::class.java)
+                        .putExtra(KnowledgeActivity.EXTRA_LINK_APP, pkg)
+                        .putExtra(KnowledgeActivity.EXTRA_LINK_TITLE, speaker)
+                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                }.onFailure {
+                    overlay?.toast("打开联系人列表失败：${it.javaClass.simpleName}")
+                }
+            }
+        }
         // Bubble menu: one manual screenshot + OCR, for any app at all.
         overlay?.onOcrCapture = { ocrCaptureManual() }
         // Keep the process at foreground importance so MIUI does not freeze us.
@@ -734,6 +753,8 @@ open class ChatCaptureService : AccessibilityService() {
         // never call back into this dead instance.
         overlay?.onManualAnalyze = null
         overlay?.onSaveContact = null
+        overlay?.onLinkContact = null
+        overlay?.onLinkSpeaker = null
         overlay?.onOcrCapture = null
         WeChatNotificationBridge.setListener(null)
         main.removeCallbacks(wechatAutoOcr)
