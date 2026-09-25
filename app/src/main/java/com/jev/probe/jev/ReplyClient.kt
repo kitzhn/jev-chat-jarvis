@@ -8,13 +8,13 @@ import org.json.JSONObject
 
 /**
  * The generative route: any OpenAI-compatible `/chat/completions` endpoint.
- * Drafts the 3 candidate replies, and (D stage) summarizes text. Reads
+ * Drafts 4 candidate replies for the GalGame selector, and (D stage) summarizes text. Reads
  * replyBaseUrl / replyKey / replyModel from [Prefs].
  */
 class ReplyClient(private val prefs: Prefs) {
 
     /**
-     * Exactly 3 varied candidate replies in Chinese.
+     * Exactly 4 varied candidate replies in Chinese.
      *
      * @param ctx D-stage knowledge context. When present its background and
      *        history are prepended to the prompt with an instruction to stay
@@ -24,12 +24,12 @@ class ReplyClient(private val prefs: Prefs) {
         val convo = snapshot.messages.takeLast(10).joinToString("\n") {
             (if (it.side == "me") "我" else "对方") + "：" + it.text
         }
-        val sys = "你是中文即时通讯回复助手。只输出一个 JSON 数组，含且仅含 3 条候选回复文本，" +
-            "三条策略要有区别（例如：一条稳妥承接、一条给具体行动或承诺、一条简短低姿态）。" +
-            "每条不超过 40 字，口语、自然、像真人在聊天软件里发消息。不要解释，不要加引号以外的内容，直接输出 JSON 数组。"
+        val sys = "你是中文即时通讯回复助手。只输出一个 JSON 数组，含且仅含 4 条候选回复文本，" +
+            "四条要明显对应不同策略：1) 温柔承接；2) 轻松自然；3) 稳妥克制；4) 主动推进。"+
+            "每条不超过 40 字，口语、自然、像真人在聊天软件里发消息。四条不要只是同义改写。不要解释，直接输出 JSON 数组。"
         val user = knowledgeBlock(relationship, ctx) +
-            "关系：$relationship\n\n最近对话：\n$convo\n\n请给出 3 条候选回复。"
-        return parseThree(chat(sys, user, temperature = 0.8))
+            "关系：$relationship\n\n最近对话：\n$convo\n\n请给出 4 条不同策略的候选回复。"
+        return parseFour(chat(sys, user, temperature = 0.85))
     }
 
     /** The background + history preamble; empty string when there is no context. */
@@ -83,7 +83,7 @@ class ReplyClient(private val prefs: Prefs) {
             ?.optJSONObject("message")?.optString("content") ?: ""
     }
 
-    private fun parseThree(content: String): List<String> {
+    private fun parseFour(content: String): List<String> {
         val start = content.indexOf('[')
         val end = content.lastIndexOf(']')
         if (start >= 0 && end > start) {
@@ -91,16 +91,17 @@ class ReplyClient(private val prefs: Prefs) {
                 val arr = JSONArray(content.substring(start, end + 1))
                 val out = ArrayList<String>()
                 for (i in 0 until arr.length()) out.add(arr.getString(i).trim())
-                if (out.size >= 3) return out.take(3)
-                while (out.size < 3) out.add("（稍等，我看下）")
+                if (out.size >= 4) return out.take(4)
+                while (out.size < 4) out.add("（稍等，我看下）")
                 return out
             } catch (_: Exception) { }
         }
         // Fallback: split lines.
-        val lines = content.split("\n").map { it.trim().trimStart('-', '*', '1', '2', '3', '.', ' ', '"') }
-            .filter { it.isNotBlank() }
-        val out = lines.take(3).toMutableList()
-        while (out.size < 3) out.add("（稍等，我看下）")
+        val lines = content.split("\n").map {
+            it.trim().trimStart('-', '*', '1', '2', '3', '4', '.', ' ', '"')
+        }.filter { it.isNotBlank() }
+        val out = lines.take(4).toMutableList()
+        while (out.size < 4) out.add("（稍等，我看下）")
         return out
     }
 }
