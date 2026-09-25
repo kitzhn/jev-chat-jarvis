@@ -54,6 +54,7 @@ object HttpJson {
         route: String,
         extraHeaders: Map<String, String> = emptyMap()
     ): JSONObject {
+        validateEndpoint(url, route)
         var attempt = 0
         var last: ApiException? = null
         while (attempt < MAX_ATTEMPTS) {
@@ -103,6 +104,23 @@ object HttpJson {
             }
         }
         throw last ?: ApiException(route, null, "请求失败")
+    }
+
+    /**
+     * Secrets/chat text may only leave the device over HTTPS. Plain HTTP is
+     * accepted solely for loopback development endpoints; LAN/public HTTP is
+     * rejected before a socket is opened.
+     */
+    private fun validateEndpoint(raw: String, route: String) {
+        val parsed = runCatching { URL(raw) }.getOrElse {
+            throw ApiException(route, null, "接口地址无效")
+        }
+        val protocol = parsed.protocol.lowercase()
+        if (protocol == "https") return
+        val host = parsed.host.lowercase()
+        val loopback = host == "localhost" || host == "127.0.0.1" || host == "::1" || host == "[::1]"
+        if (protocol == "http" && loopback) return
+        throw ApiException(route, null, "仅允许 HTTPS；HTTP 只允许 localhost/127.0.0.1 本机调试")
     }
 
     /** Body text, or "" — a null stream or a read failure never costs us the status code. */
