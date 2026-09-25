@@ -183,6 +183,8 @@ for attempt in range(10):
         subprocess.run(["adb","shell","input","tap",str((x1+x2)//2),str((y1+y2)//2)], check=True)
         time.sleep(1.0)
         sys.exit(0)
+    if mode == "optional":
+        sys.exit(0)
     if mode == "wait":
         time.sleep(.5)
     else:
@@ -203,6 +205,12 @@ adb shell am start -W -n "$PKG/com.jev.probe.SettingsActivity" >/dev/null
 wait_activity "$PKG/com.jev.probe.SettingsActivity"
 sleep 1
 adb exec-out screencap -p > screenshots/02-settings.png
+
+# Emulator images can occasionally show a Pixel Launcher ANR dialog over our
+# activity after cold boot. It is unrelated to Jev; dismiss it if present so
+# UI assertions inspect the app rather than the system dialog.
+python3 /tmp/ui_text.py optional "Wait"
+python3 /tmp/ui_text.py optional "等待"
 
 # MAJOR-09: the advanced DeepSeek thinking control exists and defaults to OFF.
 python3 /tmp/ui_text.py contains "DeepSeek 官方：启用 thinking（高级）"
