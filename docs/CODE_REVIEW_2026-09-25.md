@@ -25,6 +25,8 @@ Scope: `app/src/main`, `app/src/debug`, `integration-fixture`, Android manifests
 | MAJOR-04 | MAJOR | **APPROVAL REQUIRED** | Test architecture | `integration-fixture` is always included in the root Gradle project and owns QQ/WeChat package names for CI. Production workflows are scoped, but the fixture remains part of normal project sync. |
 | MAJOR-05 | MAJOR / DEAD-CODE | **APPROVAL REQUIRED** | Accessibility legacy | Legacy `SelectToSpeakService` and `config_disguised.xml` remain in source although production Manifest now uses normal `ChatCaptureService`. They should be deleted after approval. |
 | MAJOR-06 | MAJOR | **APPROVAL REQUIRED** | Usage privacy | Usage records persist the raw custom `baseUrl`; a user who embeds credentials in URL query/userinfo could indirectly persist a secret in `api_usage.json`. |
+| MAJOR-07 | MAJOR / SECURITY | **APPROVAL REQUIRED** | API key routing | Reply/vision keys inherit the judge key even when the target host is a different provider, which can send one provider's credential to another provider. |
+| MAJOR-08 | MAJOR / SECURITY | **APPROVAL REQUIRED** | Transport | Custom API URLs are not restricted to HTTPS; a user can configure an `http://` endpoint and send bearer credentials/content in plaintext. |
 | MEDIUM-01 | MEDIUM | OPEN | Reply parsing | Malformed model output is padded with repeated `（稍等，我看下）`, producing duplicate strategy cards instead of surfacing a generation problem. |
 | MEDIUM-02 | MEDIUM | FIXED | API usage | A request was marked “exact” if only one of prompt/completion counts was exact. Now both are required. |
 | MEDIUM-03 | MEDIUM | FIXED | Jev retry | Knowledge-context fallback retried all 4xx, including 401/403/429. Now only schema-like 400/422 are retried. |
@@ -138,6 +140,51 @@ would therefore persist the query string in `files/usage/api_usage.json`. The sa
 
 **Approval required:** yes. This changes persisted audit data and the privacy contract.
 
+### MAJOR-07 — cross-provider key fallback can disclose credentials
+
+**Files:**  
+- `app/src/main/java/com/jev/probe/core/Prefs.kt`
+- `app/src/main/java/com/jev/probe/SettingsActivity.kt`
+
+Current helpers:
+
+```
+effectiveReplyKey() = replyKey.ifBlank { judgeKey }
+effectiveVisionKey() = visionKey.ifBlank { effectiveReplyKey() }
+```
+
+This is convenient when all routes use one OpenRouter key, but unsafe when hosts differ.
+
+Example:
+1. Judge provider = OpenRouter and `judgeKey` contains an OpenRouter credential.
+2. User switches reply/vision base to DeepSeek official.
+3. Reply/vision key is still blank.
+4. The request can send the OpenRouter bearer token to `api.deepseek.com`.
+
+The same class of issue exists for arbitrary custom hosts.
+
+**Recommended fix:** key inheritance must be host/provider-aware. Only inherit a key when the source and destination belong to the same normalized provider/host. Otherwise require an explicit route key and block the request with a clear configuration error.
+
+**Approval required:** yes. This changes API configuration/fallback semantics.
+
+### MAJOR-08 — custom non-HTTPS endpoint can transmit secrets and chat text in plaintext
+
+**Files:**  
+- `app/src/main/java/com/jev/probe/jev/HttpJson.kt`
+- `app/src/main/java/com/jev/probe/SettingsActivity.kt`
+
+`HttpJson.post()` accepts any URL supported by `java.net.URL`, including `http://`. A custom endpoint therefore can receive:
+- bearer API key;
+- current conversation text;
+- contact context/history;
+- optional image data;
+
+without transport encryption.
+
+**Recommended fix:** require HTTPS for non-local endpoints. Optionally allow `http://127.0.0.1`, `http://localhost`, or private LAN endpoints only behind an explicit advanced warning/opt-in.
+
+**Approval required:** yes. This changes which custom endpoints are accepted.
+
 ---
 
 ## MEDIUM / MINOR open items
@@ -207,4 +254,6 @@ No MAJOR item below should be implemented until explicitly approved:
 - [ ] MAJOR-04 — conditionally include the integration fixture module.
 - [ ] MAJOR-05 — delete legacy disguised accessibility artifacts.
 - [ ] MAJOR-06 — sanitize persisted API base URLs.
+- [ ] MAJOR-07 — make API key inheritance provider/host-aware.
+- [ ] MAJOR-08 — require HTTPS or explicit local-network opt-in for custom endpoints.
 
