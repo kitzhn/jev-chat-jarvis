@@ -182,5 +182,12 @@ adb exec-out screencap -p > screenshots/07-wechat-ocr-geometry.png
 # Show the opt-in WeChat auto-OCR setting in the real SettingsActivity.
 adb shell am start -n "$PKG/com.jev.probe.SettingsActivity" >/dev/null
 sleep 1
-python3 /tmp/ui_text.py contains "微信实验模式"
+python3 /tmp/ui_text.py contains "微信优先用新消息通知触发 OCR"
 adb exec-out screencap -p > screenshots/08-wechat-auto-ocr-setting.png
+
+# v2.3 integration matrix: notification trigger registration/bridge, learned
+# strategy count persistence, local scene detection, and group+speaker context.
+adb shell am start -W -n "$PKG/com.jev.probe.V23FeatureDemoActivity" >/dev/null
+sleep 1
+python3 /tmp/ui_text.py wait "ALL PASS · notification → scene → person → learned ranking"
+adb exec-out screencap -p > screenshots/09-v23-integration-matrix.png
