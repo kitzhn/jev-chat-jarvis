@@ -259,14 +259,16 @@ class SettingsActivity : AppCompatActivity() {
         val visionModelEdit = edit(prefs.visionModel, Prefs.DEFAULT_VISION_MODEL)
         val visionIdx = when (prefs.visionBaseUrl.trim().trimEnd('/')) {
             Prefs.DEFAULT_VISION_BASE -> 0
-            Prefs.DASHSCOPE_BASE -> 1
-            else -> 2
+            Prefs.DEEPSEEK_BASE -> 1
+            Prefs.DASHSCOPE_BASE -> 2
+            else -> 3
         }
         visionCard.addView(pills(
-            listOf("OpenRouter", "通义兼容", "自定义"), visionIdx) { idx ->
+            listOf("OpenRouter", "DeepSeek 官方", "通义兼容", "自定义"), visionIdx) { idx ->
             when (idx) {
                 0 -> { visionBaseEdit.setText(Prefs.DEFAULT_VISION_BASE); visionModelEdit.setText(Prefs.DEFAULT_VISION_MODEL) }
-                1 -> { visionBaseEdit.setText(Prefs.DASHSCOPE_BASE); visionModelEdit.setText(Prefs.DASHSCOPE_VISION_MODEL) }
+                1 -> { visionBaseEdit.setText(Prefs.DEEPSEEK_BASE); visionModelEdit.setText(Prefs.DEEPSEEK_MODEL) }
+                2 -> { visionBaseEdit.setText(Prefs.DASHSCOPE_BASE); visionModelEdit.setText(Prefs.DASHSCOPE_VISION_MODEL) }
             }
         })
         visionCard.addView(label("Base URL"))
@@ -278,10 +280,6 @@ class SettingsActivity : AppCompatActivity() {
         val visionResult = resultText()
         visionCard.addView(cardBtn("测试视觉") {
             val visionBase = visionBaseEdit.text.toString().trim()
-            if (!VisionClient.supportsVision(visionBase.ifBlank { Prefs.DEFAULT_VISION_BASE })) {
-                visionResult.text = GUARD_NO_VISION
-                return@cardBtn
-            }
             val probe = draftPrefs(SCRATCH_VISION) {
                 judgeKey = judgeKeyEdit.text.toString().trim()
                 replyBaseUrl = replyBaseEdit.text.toString().trim().ifBlank { Prefs.DEFAULT_REPLY_BASE }
@@ -341,6 +339,9 @@ class SettingsActivity : AppCompatActivity() {
         })
         apiQuickCard.addView(cardBtn("从 JSON 导入 API 配置") {
             showImportApiConfigDialog()
+        })
+        apiQuickCard.addView(cardBtn("查看 API 消耗仪表盘") {
+            startActivity(android.content.Intent(this, ApiUsageActivity::class.java))
         })
         root.addView(apiQuickCard)
 
@@ -787,10 +788,6 @@ class SettingsActivity : AppCompatActivity() {
 
     companion object {
         private const val TAG = "JEVASSIST"
-
-        /** DeepSeek's official API has no vision model; say so instead of a 400. */
-        private const val GUARD_NO_VISION =
-            "该接口不支持视觉（DeepSeek 官方没有 image_url），请换 OpenRouter 或通义兼容"
 
         /** One scratch prefs file per test button; never the real config. */
         private const val SCRATCH_JUDGE = "jev_probe_scratch_judge"
