@@ -56,6 +56,9 @@ class OverlayController(private val ctx: Context) {
     /** Bubble menu → explicitly link this app/title to an existing real-world contact. */
     var onLinkContact: (() -> Unit)? = null
 
+    /** Bubble menu → link the current group speaker nickname to a real-world contact. */
+    var onLinkSpeaker: (() -> Unit)? = null
+
     /** Bubble menu → one manual screenshot + OCR of whatever app is open. */
     var onOcrCapture: (() -> Unit)? = null
 
@@ -247,6 +250,9 @@ class OverlayController(private val ctx: Context) {
         menu.addView(menuItem("截屏识别一次") { root?.removeView(menu); onOcrCapture?.invoke() })
         menu.addView(menuItem("把当前会话存为联系人") { onSaveContact?.invoke(); root?.removeView(menu) })
         menu.addView(menuItem("关联当前会话到已有联系人") { onLinkContact?.invoke(); root?.removeView(menu) })
+        if (onLinkSpeaker != null) {
+            menu.addView(menuItem("关联当前发言人到已有联系人") { onLinkSpeaker?.invoke(); root?.removeView(menu) })
+        }
         menu.addView(menuItem("打开设置") { openSettings(); root?.removeView(menu) })
         menu.addView(menuItem("隐藏助手（本次）") { hide() })
         menu.addView(menuItem("取消") { root?.removeView(menu) })
