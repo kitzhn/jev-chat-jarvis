@@ -1,0 +1,23 @@
+name: Temporary version tag setup
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  tag:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+      - name: Remove temporary helper and create release tag
+        shell: bash
+        run: |
+          set -euo pipefail
+          git rm .github/workflows/tag-v2.5.0-once.yml
+          git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'chore: remove temporary tag workflow'
+          git push origin HEAD:refs/heads/main
+          git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' tag -a v2.5.0 -m 'Jev Ultimate 2.5.0'
+          git push origin refs/tags/v2.5.0
