@@ -26,6 +26,7 @@ import com.jev.probe.core.kb.KbStore
 import com.jev.probe.core.kb.Note
 import com.jev.probe.core.kb.PlatformIdentity
 import com.jev.probe.core.kb.RelationshipEvent
+import com.jev.probe.ui.RelationshipGraphView
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -666,52 +667,63 @@ class KnowledgeActivity : AppCompatActivity() {
             null
         ))
 
-        container.addView(card().apply {
-            addView(text("联系人关系网", 14f, ink, bold = true))
-            addView(text(
-                "这里记录“联系人和联系人之间”的关系，例如同学、同事、家人、通过谁认识。它和你本人对某个联系人的好感度是两套不同数据。",
-                11.5f, sub).apply { setPadding(0, dp(5), 0, 0) })
+        val intro = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            background = round(dp(16), Color.parseColor("#071226"))
+            setPadding(dp(14), dp(12), dp(14), dp(12))
+            layoutParams = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            ).apply { topMargin = dp(10) }
+        }
+        intro.addView(text("RELATIONSHIP NETWORK", 15f, Color.parseColor("#7EE7FF"), bold = true))
+        intro.addView(text(
+            "本地关系图 · 节点代表联系人，发光连线代表联系人之间的关系。点节点编辑画像，点连线编辑关系。",
+            11.5f, Color.parseColor("#A8C5DF")).apply { setPadding(0, dp(5), 0, 0) })
+        container.addView(intro)
+
+        if (contacts.size < 2 || edges.isEmpty()) {
+            val graph = RelationshipGraphView(this).apply {
+                layoutParams = LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, dp(420)).apply { topMargin = dp(10) }
+                submit(contacts, edges)
+                onContactClick = { editContactDialog(it) }
+            }
+            container.addView(graph)
+            container.addView(emptyCard(
+                if (contacts.size < 2) "先建立至少两个联系人。"
+                else "还没有关系边，点击“新建关系”建立第一条连线。"))
+            return
+        }
+
+        val graph = RelationshipGraphView(this).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, dp(420)).apply { topMargin = dp(10) }
+            submit(contacts, edges)
+            onContactClick = { editContactDialog(it) }
+            onRelationClick = { editRelationDialog(it) }
+        }
+        container.addView(graph)
+
+        container.addView(text(
+            "布局规则：连接最多的联系人自动成为中心节点；外围节点按关联度分布。关系强度会影响连线粗细。",
+            11f, sub).apply { setPadding(dp(2), dp(8), 0, 0) })
+
+        container.addView(text("关系详情", 13f, ink, bold = true).apply {
+            setPadding(dp(2), dp(14), 0, 0)
         })
-
-        if (contacts.size < 2) {
-            container.addView(emptyCard("先建立至少两个联系人，才能创建关系边。"))
-            return
-        }
-        if (edges.isEmpty()) {
-            container.addView(emptyCard("还没有关系边。点击“新建关系”开始建立联系人之间的关系网络。"))
-            return
-        }
-
-        edges.forEach { edge ->
-            val from = contacts.firstOrNull { it.id == edge.fromId }?.name ?: "未知联系人"
-            val to = contacts.firstOrNull { it.id == edge.toId }?.name ?: "未知联系人"
+        edges.take(8).forEach { relation ->
+            val from = contacts.firstOrNull { it.id == relation.fromId }?.name ?: "未知联系人"
+            val to = contacts.firstOrNull { it.id == relation.toId }?.name ?: "未知联系人"
             container.addView(card().apply {
-                addView(text("${from}  ↔  ${to}", 15f, ink, bold = true))
+                addView(text(from + "  ↔  " + to, 14f, ink, bold = true))
                 addView(text(
-                    edge.type.ifBlank { "未命名关系" } + " · 强度 ${edge.strength}/100",
-                    12.5f, accent, bold = true).apply { setPadding(0, dp(5), 0, 0) })
-                addView(ProgressBar(this@KnowledgeActivity, null,
-                    android.R.attr.progressBarStyleHorizontal).apply {
-                    max = 100
-                    progress = edge.strength.coerceIn(0, 100)
-                    layoutParams = LinearLayout.LayoutParams(
-                        ViewGroup.LayoutParams.MATCH_PARENT, dp(6)).apply { topMargin = dp(5) }
-                })
-                if (edge.note.isNotBlank()) {
-                    addView(text(edge.note, 12f, sub).apply { setPadding(0, dp(6), 0, 0) })
+                    relation.type.ifBlank { "未命名关系" } + " · 强度 " + relation.strength + "/100",
+                    12f, accent, bold = true).apply { setPadding(0, dp(4), 0, 0) })
+                if (relation.note.isNotBlank()) {
+                    addView(text(relation.note, 11.5f, sub).apply { setPadding(0, dp(4), 0, 0) })
                 }
-                val actions = LinearLayout(this@KnowledgeActivity).apply {
-                    orientation = LinearLayout.HORIZONTAL
-                    setPadding(0, dp(8), 0, 0)
-                }
-                actions.addView(miniAction("编辑") { editRelationDialog(edge) })
-                actions.addView(miniAction("删除", danger = true) {
-                    confirm("删除关系", "删除「${from} ↔ ${to}」这条关系边？") {
-                        store.deleteContactRelation(edge.id)
-                        render()
-                    }
-                })
-                addView(actions)
+                setOnClickListener { editRelationDialog(relation) }
             })
         }
     }
