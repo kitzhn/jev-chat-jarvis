@@ -10,6 +10,12 @@ on:
       - "app/src/main/java/com/jev/probe/KnowledgeActivity.kt"
       - "app/src/main/java/com/jev/probe/ui/RelationshipGraphView.kt"
       - "app/src/main/java/com/jev/probe/overlay/OverlayController.kt"
+      - "app/src/main/java/com/jev/probe/capture/ChatCaptureService.kt"
+      - "app/src/main/java/com/jev/probe/capture/ocr/OcrChatGrouper.kt"
+      - "app/src/main/java/com/jev/probe/jev/JevClient.kt"
+      - "app/src/main/java/com/jev/probe/jev/RelationshipStrategyPolicy.kt"
+      - "app/src/main/java/com/jev/probe/core/Prefs.kt"
+      - "app/src/main/java/com/jev/probe/SettingsActivity.kt"
       - "app/src/debug/**"
   workflow_dispatch:
 
