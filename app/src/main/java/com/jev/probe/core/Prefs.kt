@@ -232,6 +232,11 @@ class Prefs(context: Context, prefsName: String = PREFS_MAIN) {
         get() = sp.getBoolean(K_RELATION_WEIGHTING, true)
         set(v) = sp.edit().putBoolean(K_RELATION_WEIGHTING, v).apply()
 
+    /** Learn only the owner's explicit GalGame option taps, stored locally per contact. */
+    var strategyLearningEnabled: Boolean
+        get() = sp.getBoolean(K_STRATEGY_LEARNING, true)
+        set(v) = sp.edit().putBoolean(K_STRATEGY_LEARNING, v).apply()
+
     // ------------------------------------------------------------- helpers
 
     /** Reply route key, falling back to the judge key. */
@@ -308,6 +313,7 @@ class Prefs(context: Context, prefsName: String = PREFS_MAIN) {
         private const val K_BUBBLE_X = "bubble_x"
         private const val K_AUTO = "auto_analyze"
         private const val K_RELATION_WEIGHTING = "relationship_strategy_weighting"
+        private const val K_STRATEGY_LEARNING = "strategy_learning_enabled"
 
         const val PROVIDER_BOCHA = "bocha"
         const val PROVIDER_OPENROUTER = "openrouter"
