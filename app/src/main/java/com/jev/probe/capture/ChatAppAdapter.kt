@@ -80,6 +80,10 @@ private val WECHAT_TITLE_EXCLUDE_PUNCT = Regex("""[，。？！、]""")
 /** A WeChat group title's "(N)" member-count suffix, half- or full-width. */
 private val WECHAT_GROUP_COUNT_SUFFIX = Regex("""[（(]\d+[）)]""")
 
+internal fun isLikelyGroupTitle(title: String?): Boolean =
+    !title.isNullOrBlank() && WECHAT_GROUP_COUNT_SUFFIX.containsMatchIn(title)
+
+
 /**
  * WeChat conversation title (v1.3 fix): a group's pinned announcement or a
  * stray message can sit in the same "topmost, short, centered" search
@@ -170,7 +174,11 @@ class WeChatAdapter : ChatAppAdapter {
         val msgs = bubbles.map { (_, cx, text) ->
             Msg(if (cx > width / 2) "me" else "other", text)
         }
-        return ChatSnapshot(title, msgs)
+        return ChatSnapshot(
+            title,
+            msgs,
+            conversationKind = if (isLikelyGroupTitle(title)) "group" else "direct"
+        )
     }
 
     companion object {
@@ -201,6 +209,7 @@ class QQAdapter : ChatAppAdapter {
         val width = res.displayMetrics.widthPixels
         // top, left, right, text
         val bubbles = ArrayList<Bubble>()
+        val senderLabels = ArrayList<Pair<Int, String>>()
         var firstBubbleTop = Int.MAX_VALUE
         var title: String? = null
         var hasInput = false
@@ -219,6 +228,10 @@ class QQAdapter : ChatAppAdapter {
                 if (b.top < firstBubbleTop) firstBubbleTop = b.top
             }
             if (!hasInput && id == INPUT_ID) hasInput = true
+            if (id == SENDER_ID && !text.isNullOrBlank()) {
+                val b = Rect(); node.getBoundsInScreen(b)
+                senderLabels.add(b.top to text.trim())
+            }
             if (id == TITLE_ID && title == null) text?.let { if (it.isNotBlank()) title = it }
             for (i in node.childCount - 1 downTo 0) node.getChild(i)?.let { stack.addLast(it) }
         }
@@ -228,19 +241,30 @@ class QQAdapter : ChatAppAdapter {
         if (bubbles.isEmpty()) return ChatSnapshot(title, emptyList())
 
         val avatarEdge = (width * 0.13).toInt()
+        val maxSenderGap = (res.displayMetrics.density * 120).toInt()
         bubbles.sortBy { it.top }
         val msgs = bubbles.map { b ->
             val dl = kotlin.math.abs(b.left - avatarEdge)
             val dr = kotlin.math.abs((width - avatarEdge) - b.right)
-            Msg(if (dr < dl) "me" else "other", b.text)
+            val side = if (dr < dl) "me" else "other"
+            val speaker = if (side == "other") {
+                senderLabels
+                    .filter { (top, _) -> top <= b.top && b.top - top <= maxSenderGap }
+                    .maxByOrNull { it.first }
+                    ?.second
+            } else null
+            Msg(side, b.text, speaker)
         }
-        return ChatSnapshot(title, msgs)
+        val group = isLikelyGroupTitle(title) ||
+            msgs.mapNotNull { it.speaker }.distinct().size > 1
+        return ChatSnapshot(title, msgs, conversationKind = if (group) "group" else "direct")
     }
 
     private data class Bubble(val top: Int, val left: Int, val right: Int, val text: String)
 
     companion object {
         private const val BUBBLE_ID = "com.tencent.mobileqq:id/mjn"
+        private const val SENDER_ID = "com.tencent.mobileqq:id/mjq"
         private const val TITLE_ID = "com.tencent.mobileqq:id/371"
         private const val INPUT_ID = "com.tencent.mobileqq:id/input"
     }
@@ -502,8 +526,12 @@ class XAdapter : ChatAppAdapter {
         // In a DM thread but no rows parsed → empty snapshot (OCR fallback cue).
         if (rows.isEmpty()) return ChatSnapshot(title, emptyList())
         rows.sortBy { it.top }
-        val msgs = rows.map { Msg(if (it.sender == "你" || it.sender == "You") "me" else "other", it.text) }
-        return ChatSnapshot(title, msgs)
+        val msgs = rows.map {
+            val mine = it.sender == "你" || it.sender == "You"
+            Msg(if (mine) "me" else "other", it.text, if (mine) null else it.sender)
+        }
+        val group = msgs.mapNotNull { it.speaker }.distinct().size > 1
+        return ChatSnapshot(title, msgs, conversationKind = if (group) "group" else "direct")
     }
 
     private data class Row(val top: Int, val sender: String, val text: String)
