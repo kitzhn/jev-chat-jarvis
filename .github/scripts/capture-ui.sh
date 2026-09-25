@@ -169,7 +169,7 @@ adb exec-out screencap -p > screenshots/05-galgame-options.png
 # verified through the ordinary EditText hierarchy after the overlay collapses.
 adb shell input tap 430 1320
 sleep 1
-python3 /tmp/ui_text.py wait "可以呀，你定个时间，我们找个舒服的地方慢慢聊。"
+python3 /tmp/ui_text.py wait "好啊，那周末见～你想吃什么？"
 adb exec-out screencap -p > screenshots/06-galgame-filled.png
 
 
