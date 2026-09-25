@@ -36,7 +36,8 @@ object ConversationSceneDetector {
             ))
         )
 
-        val best = scores.maxByOrNull { it.value } ?: return ConversationScene.UNKNOWN
+        val best = scores.entries.maxByOrNull { entry -> entry.value }
+            ?: return ConversationScene.UNKNOWN
         return if (best.value <= 0) ConversationScene.CASUAL else best.key
     }
 
