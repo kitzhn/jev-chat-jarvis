@@ -93,6 +93,7 @@ open class ChatCaptureService : AccessibilityService() {
     private var pendingWechatTitle: String? = null
     private var lastWechatAutoShotAt: Long = 0L
     private var lastWechatFailureNoticeAt: Long = 0L
+    private var lastWechatNotificationAt: Long = 0L
     private val wechatAutoOcr = Runnable { runWechatAutoOcr() }
 
     override fun onServiceConnected() {
@@ -101,6 +102,9 @@ open class ChatCaptureService : AccessibilityService() {
         overlay = OverlayController(this)
         overlay?.onManualAnalyze = {
             currentSnapshot?.let { pendingSnapshot = it; runAnalysis() }
+        }
+        WeChatNotificationBridge.setListener { signal ->
+            main.post { onWechatNotification(signal) }
         }
         // Bubble menu: file the open conversation as a knowledge-base contact.
         // Contacts are never created automatically — this is the one-tap way in.
@@ -309,11 +313,28 @@ open class ChatCaptureService : AccessibilityService() {
         }?.takeIf { !isTransientTitle(it) } ?: lastGoodTitle[PKG_WECHAT]
         pendingWechatTitle?.let { lastGoodTitle[PKG_WECHAT] = it }
 
-        // Content-change bursts are common while typing/scrolling. Re-arm a short
-        // debounce so one settled screen produces at most one screenshot.
-        main.removeCallbacks(wechatAutoOcr)
-        main.postDelayed(wechatAutoOcr, WECHAT_DEBOUNCE_MS)
+        // When notification-trigger mode is enabled, ordinary accessibility
+        // content changes keep the bubble alive but do not schedule screenshots.
+        if (!prefs.wechatNotificationTrigger) {
+            main.removeCallbacks(wechatAutoOcr)
+            main.postDelayed(wechatAutoOcr, WECHAT_DEBOUNCE_MS)
+        }
         if (overlay?.isShowing() != true) main.post { overlay?.showIdle(pendingWechatTitle) }
+    }
+
+    private fun onWechatNotification(signal: WeChatNotificationBridge.Signal) {
+        if (!prefs.enabled || !prefs.wechatAutoOcr || !prefs.wechatNotificationTrigger) return
+        val pkg = rootInActiveWindow?.packageName?.toString() ?: return
+        if (pkg != PKG_WECHAT) return
+
+        lastWechatNotificationAt = SystemClock.elapsedRealtime()
+        signal.conversationTitle?.takeIf { !isTransientTitle(it) }?.let { title ->
+            // Use the notification title only as a hint. If the active window
+            // already has a stable title, prefer that to avoid cross-chat shots.
+            if (pendingWechatTitle.isNullOrBlank()) pendingWechatTitle = title
+        }
+        main.removeCallbacks(wechatAutoOcr)
+        main.postDelayed(wechatAutoOcr, WECHAT_NOTIFICATION_SETTLE_MS)
     }
 
     private fun runWechatAutoOcr() {
@@ -389,7 +410,19 @@ open class ChatCaptureService : AccessibilityService() {
                 }
                 main.post {
                     analyzing = false
-                    overlay?.showReplies(ranked, replyError) { text -> fillInput(text) }
+                    overlay?.showReplies(ranked, replyError) { chosen ->
+                        ctx?.contact?.let { contact ->
+                            submit {
+                                runCatching {
+                                    KbStore.get(this).recordStrategySelection(
+                                        contact.id,
+                                        chosen.strategy.name.lowercase()
+                                    )
+                                }
+                            }
+                        }
+                        fillInput(chosen.text)
+                    }
                 }
             }
         }
@@ -516,7 +549,16 @@ open class ChatCaptureService : AccessibilityService() {
             val title = treeTitle?.takeIf { it.isNotBlank() }
                 ?: lines.firstOrNull()?.text?.trim()?.take(24)
             val note = if (pkg == PKG_WECHAT) WECHAT_OCR_NOTE else OCR_NOTE
-            finishOcrSnapshot(ChatSnapshot(title, msgs, note = note), pkg, manual)
+            finishOcrSnapshot(
+                ChatSnapshot(
+                    title = title,
+                    messages = msgs,
+                    note = note,
+                    conversationKind = if (pkg == PKG_WECHAT && isLikelyGroupTitle(title)) "group" else "direct"
+                ),
+                pkg,
+                manual
+            )
         }
     }
 
@@ -693,6 +735,7 @@ open class ChatCaptureService : AccessibilityService() {
         overlay?.onManualAnalyze = null
         overlay?.onSaveContact = null
         overlay?.onOcrCapture = null
+        WeChatNotificationBridge.setListener(null)
         main.removeCallbacks(wechatAutoOcr)
         overlay?.hide()
         overlay = null
@@ -705,6 +748,7 @@ open class ChatCaptureService : AccessibilityService() {
         private const val PKG_WECHAT = "com.tencent.mm"
         private const val WECHAT_DEBOUNCE_MS = 900L
         private const val WECHAT_MIN_INTERVAL_MS = 4000L
+        private const val WECHAT_NOTIFICATION_SETTLE_MS = 500L
         private const val WECHAT_FAILURE_NOTICE_MS = 60_000L
 
         /** Whole-screen OCR keeps the middle: no action bar, no input area. */
