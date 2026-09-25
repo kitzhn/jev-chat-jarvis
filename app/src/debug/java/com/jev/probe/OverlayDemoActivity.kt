@@ -14,7 +14,10 @@ import androidx.appcompat.app.AppCompatActivity
 import com.jev.probe.core.Analysis
 import com.jev.probe.core.Choice
 import com.jev.probe.core.RankedReply
+import com.jev.probe.core.ReplyStrategy
 import com.jev.probe.core.Score
+import com.jev.probe.core.kb.Contact
+import com.jev.probe.jev.RelationshipStrategyPolicy
 import com.jev.probe.overlay.OverlayController
 
 /**
@@ -94,13 +97,33 @@ class OverlayDemoActivity : AppCompatActivity() {
                     latencyMs = 420
                 )
             )
+            val demoContact = Contact(
+                id = "policy-demo",
+                name = "演示联系人 A",
+                relationship = "朋友",
+                relationshipStage = "亲近",
+                affection = 85,
+                trust = 80,
+                closeness = 90,
+                communicationStyle = "喜欢轻松自然、带一点玩笑的聊天",
+                boundaries = "不喜欢被催，也不喜欢连续追问"
+            )
+            val equalJudgeScores = listOf(
+                RankedReply(
+                    "可以呀，你定个时间，我们找个舒服的地方慢慢聊。",
+                    .25, ReplyStrategy.WARM, .25, 1.0),
+                RankedReply(
+                    "好啊，那周末见～你想吃什么？",
+                    .25, ReplyStrategy.PLAYFUL, .25, 1.0),
+                RankedReply(
+                    "行，我周末有空，到时候你把时间地点发我就好。",
+                    .25, ReplyStrategy.STEADY, .25, 1.0),
+                RankedReply(
+                    "那就周六？我来定地方，你看可以吗？",
+                    .25, ReplyStrategy.PROACTIVE, .25, 1.0)
+            )
             overlay.showReplies(
-                listOf(
-                    RankedReply("可以呀，你定个时间，我们找个舒服的地方慢慢聊。", .36),
-                    RankedReply("好啊，那周末见～你想吃什么？", .28),
-                    RankedReply("行，我周末有空，到时候你把时间地点发我就好。", .21),
-                    RankedReply("那就周六？我来定地方，你看可以吗？", .15)
-                ),
+                RelationshipStrategyPolicy.rerank(equalJudgeScores, demoContact),
                 null
             ) { chosen ->
                 input.setText(chosen)
