@@ -616,19 +616,6 @@ class OverlayController(private val ctx: Context) {
                 textSize = 9.5f
             })
         }
-        val habitPct = ((reply.habitWeight - 1.0) * 100).roundToInt()
-        val scenePct = ((reply.sceneWeight - 1.0) * 100).roundToInt()
-        if (habitPct != 0 || scenePct != 0 || reply.scene.label != "未识别") {
-            middle.addView(TextView(ctx).apply {
-                val habitText = if (habitPct == 0) "" else
-                    "习惯" + (if (habitPct > 0) "+${habitPct}%" else "${habitPct}%")
-                val sceneText = if (scenePct == 0) "场景 ${reply.scene.label}" else
-                    "场景 ${reply.scene.label} " + (if (scenePct > 0) "+${scenePct}%" else "${scenePct}%")
-                this.text = listOf(habitText, sceneText).filter { it.isNotBlank() }.joinToString(" · ")
-                setTextColor(Color.parseColor("#64748B"))
-                textSize = 9.5f
-            })
-        }
         middle.addView(TextView(ctx).apply {
             this.text = text
             setTextColor(Color.parseColor("#111827"))
