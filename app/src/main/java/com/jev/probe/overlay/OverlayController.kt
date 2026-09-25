@@ -70,7 +70,7 @@ class OverlayController(private val ctx: Context) {
     fun isShowing(): Boolean = root != null
 
     private var lastJudgment: Analysis? = null
-    private var lastFill: ((String) -> Unit)? = null
+    private var lastFill: ((RankedReply) -> Unit)? = null
 
     /** Set when [showReplies] was handed a draftAndRank failure, so the panel
      *  can say so instead of silently showing "（未生成候选回复）". */
@@ -382,7 +382,7 @@ class OverlayController(private val ctx: Context) {
         render(a, generating = true)
     }
 
-    fun showReplies(ranked: List<RankedReply>, error: String? = null, onFill: (String) -> Unit) {
+    fun showReplies(ranked: List<RankedReply>, error: String? = null, onFill: (RankedReply) -> Unit) {
         lastFill = onFill
         replyError = error
         val a = lastJudgment?.copy(rankedReplies = ranked) ?: return
@@ -446,10 +446,7 @@ class OverlayController(private val ctx: Context) {
             a.rankedReplies.take(4).forEachIndexed { i, r ->
                 views.add(dialogueOptionCard(
                     index = i,
-                    text = r.text,
-                    pct = (r.prob * 100).roundToInt(),
-                    strategy = r.strategy,
-                    relationWeight = r.relationWeight,
+                    reply = r,
                     onFill = fill
                 ))
             }
@@ -515,12 +512,13 @@ class OverlayController(private val ctx: Context) {
      */
     private fun dialogueOptionCard(
         index: Int,
-        text: String,
-        pct: Int,
-        strategy: ReplyStrategy,
-        relationWeight: Double,
-        onFill: (String) -> Unit
+        reply: RankedReply,
+        onFill: (RankedReply) -> Unit
     ): View {
+        val text = reply.text
+        val pct = (reply.prob * 100).roundToInt()
+        val strategy = reply.strategy
+        val relationWeight = reply.relationWeight
         val labels = listOf("A", "B", "C", "D")
         val style = when (strategy) {
             ReplyStrategy.WARM -> "温柔承接"
@@ -552,7 +550,7 @@ class OverlayController(private val ctx: Context) {
             isClickable = true
             setOnClickListener {
                 android.util.Log.d("JEVASSIST", "dialogue option tapped index=" + index)
-                onFill(text)
+                onFill(reply)
                 if (expanded) toggle()
             }
             setOnLongClickListener {
@@ -592,6 +590,19 @@ class OverlayController(private val ctx: Context) {
                 val pctWeight = ((relationWeight - 1.0) * 100).roundToInt()
                 this.text = "关系加权 " + if (pctWeight >= 0) "+$pctWeight%" else "$pctWeight%"
                 setTextColor(Color.parseColor(if (pctWeight >= 0) "#16A34A" else "#D97706"))
+                textSize = 9.5f
+            })
+        }
+        val habitPct = ((reply.habitWeight - 1.0) * 100).roundToInt()
+        val scenePct = ((reply.sceneWeight - 1.0) * 100).roundToInt()
+        if (habitPct != 0 || scenePct != 0 || reply.scene.label != "未识别") {
+            middle.addView(TextView(ctx).apply {
+                val habitText = if (habitPct == 0) "" else
+                    "习惯" + (if (habitPct > 0) "+${habitPct}%" else "${habitPct}%")
+                val sceneText = if (scenePct == 0) "场景 ${reply.scene.label}" else
+                    "场景 ${reply.scene.label} " + (if (scenePct > 0) "+${scenePct}%" else "${scenePct}%")
+                this.text = listOf(habitText, sceneText).filter { it.isNotBlank() }.joinToString(" · ")
+                setTextColor(Color.parseColor("#64748B"))
                 textSize = 9.5f
             })
         }
