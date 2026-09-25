@@ -18,6 +18,7 @@ rootProject.name = "jev-android"
 include(":app")
 
 // CI-only messenger fixtures intentionally stay out of normal IDE/Gradle sync.
+// Validation PR marker for the approved MAJOR fixes; no runtime behavior change.
 if (System.getenv("JEV_INTEGRATION_FIXTURES") == "1") {
     include(":integration-fixture")
 }
