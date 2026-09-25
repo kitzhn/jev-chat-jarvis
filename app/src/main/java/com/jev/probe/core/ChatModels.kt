@@ -53,4 +53,27 @@ data class Analysis(
 
 data class Choice(val choice: String, val confidence: Double, val probabilities: Map<String, Double>)
 data class Score(val score: Double, val confidence: Double, val maxLevel: Int)
-data class RankedReply(val text: String, val prob: Double)
+
+enum class ReplyStrategy {
+    WARM,
+    PLAYFUL,
+    STEADY,
+    PROACTIVE,
+    UNKNOWN
+}
+
+data class ReplyDraft(
+    val text: String,
+    val strategy: ReplyStrategy
+)
+
+data class RankedReply(
+    val text: String,
+    /** Final normalized score after Jev ranking + relationship prior. */
+    val prob: Double,
+    val strategy: ReplyStrategy = ReplyStrategy.UNKNOWN,
+    /** Raw probability returned by the Jev ranking route. */
+    val judgeProb: Double = prob,
+    /** Relationship/profile multiplier applied before final normalization. */
+    val relationWeight: Double = 1.0
+)
