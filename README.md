@@ -12,7 +12,7 @@
 [![Android](https://img.shields.io/badge/Android-11%2B-3DDC84?style=flat-square&logo=android&logoColor=white)](#快速开始)
 [![License](https://img.shields.io/github/license/jev-chat/jev-chat-jarvis?style=flat-square)](LICENSE)
 
-[官网](https://chatjevs.com) · [正式版下载](https://github.com/kitzhn/jev-chat-jarvis/releases/latest) · [直接下载 APK](https://github.com/kitzhn/jev-chat-jarvis/releases/latest/download/jev-ultimate-arm64.apk) · [测试版](https://github.com/kitzhn/jev-chat-jarvis/actions/workflows/build-debug.yml) · [更新日志](CHANGELOG.md) · [macOS 版](https://github.com/jev-chat/jev-chat-mac) · [Windows 版](https://github.com/jev-chat/jev-chat-windows)
+[官网](https://chatjevs.com) · [正式版发布/下载](https://github.com/kitzhn/jev-chat-jarvis/actions/workflows/build-release.yml) · [Releases](https://github.com/kitzhn/jev-chat-jarvis/releases) · [测试版](https://github.com/kitzhn/jev-chat-jarvis/actions/workflows/build-debug.yml) · [更新日志](CHANGELOG.md) · [macOS 版](https://github.com/jev-chat/jev-chat-mac) · [Windows 版](https://github.com/jev-chat/jev-chat-windows)
 
 </div>
 
@@ -21,14 +21,14 @@
 > 本 Fork 当前为 **Jev Ultimate 2.4**：在上游基础上增加了 **跨 App / 群聊人物身份、联系人画像、好感/信任/亲密模型、科幻关系节点图、GalGame 四策略回复、画像 + 用户选择习惯 + 对话场景自适应排序、微信实验通知触发 OCR、显式重复联系人合并、API 消耗仪表盘、API 快速方案以及无密钥配置导入/导出**。
 >
 > **我的下载入口（kitzhn/jev-chat-jarvis）：**  
-> - **[正式版下载页（推荐）](https://github.com/kitzhn/jev-chat-jarvis/releases/latest)** — 永远跳到当前最新正式 Release。  
-> - **[直接下载最新 APK](https://github.com/kitzhn/jev-chat-jarvis/releases/latest/download/jev-ultimate-arm64.apk)** — 固定直链，可收藏；以后更新版本无需改链接。  
+> - **[正式版发布 / 下载入口](https://github.com/kitzhn/jev-chat-jarvis/actions/workflows/build-release.yml)** — 当前一定可打开；首次配置签名后点 **Run workflow** 即会生成正式 Release。  
+> - **[Releases 页面](https://github.com/kitzhn/jev-chat-jarvis/releases)** — 首个正式版生成后，这里会长期保留所有版本。  
 > - [Debug 测试版](https://github.com/kitzhn/jev-chat-jarvis/actions/workflows/build-debug.yml) — 打开最新成功运行，在 **Artifacts** 下载 `jev-ultimate-debug`。  
 > - [Android 15 模拟器验证与截图](https://github.com/kitzhn/jev-chat-jarvis/actions/workflows/ui-emulator.yml) — 最新成功运行的 **Artifacts** 中下载 `jev-ultimate-emulator-evidence`。  
 >
-> 正式发布工作流会读取 App 的 `versionName` 生成版本标签（例如 `v2.4.0`），并将签名 APK 以固定文件名 `jev-ultimate-arm64.apk` 发布到 GitHub Releases，同时附带 SHA-256 校验文件。因此“直接下载最新 APK”链接可以长期保持不变。  
+> 正式发布工作流会读取 App 的 `versionName` 生成版本标签（例如 `v2.4.0`），并将签名 APK 以固定文件名 `jev-ultimate-arm64.apk` 发布到 GitHub Releases，同时附带 SHA-256 校验文件。首个 Release 成功后，固定直链 `https://github.com/kitzhn/jev-chat-jarvis/releases/latest/download/jev-ultimate-arm64.apk` 就会永久可用。  
 >
-> **首次正式发布前只需配置一次签名：** 仓库 Settings → Secrets and variables → Actions 中添加 `JEV_KEYSTORE_B64`、`JEV_STORE_PASSWORD`、`JEV_KEY_ALIAS`、`JEV_KEY_PASSWORD`。之后进入 [Build Signed Ultimate Release](https://github.com/kitzhn/jev-chat-jarvis/actions/workflows/build-release.yml) 点 **Run workflow** 即可更新正式版；README 的下载地址无需再修改。
+> **首次正式发布只需配置 1 个 Secret：** `JEV_RELEASE_BUNDLE_B64`。它同时包含 keystore 与签名参数；workflow 仍兼容旧的四项 Secret。配置一次后，之后只需点 **Run workflow** 即可更新正式版。
 >
 > 给朋友使用请先看：[**Jev Ultimate 中文使用说明书**](docs/USER_GUIDE_ZH.md)  
 > OpenRouter 无密钥配置示例：[docs/api-config-openrouter.example.json](docs/api-config-openrouter.example.json) · [代码审阅记录](docs/CODE_REVIEW_2026-09-25.md)
@@ -95,8 +95,8 @@
 
 **1. 装包。** Ultimate 正式版请优先使用 GitHub Releases：
 
-- **正式版（推荐）：** [最新 Release 页面](https://github.com/kitzhn/jev-chat-jarvis/releases/latest)。
-- **一键直下 APK：** [jev-ultimate-arm64.apk](https://github.com/kitzhn/jev-chat-jarvis/releases/latest/download/jev-ultimate-arm64.apk)。
+- **正式版发布 / 下载入口：** [Build Signed Ultimate Release](https://github.com/kitzhn/jev-chat-jarvis/actions/workflows/build-release.yml)。
+- **历史正式版：** [Releases](https://github.com/kitzhn/jev-chat-jarvis/releases)。首个 Release 发布成功后，README 会继续使用固定 latest 下载地址。
 - **自己测试：** [Build Android Debug APK](https://github.com/kitzhn/jev-chat-jarvis/actions/workflows/build-debug.yml) → 打开最新成功运行 → Artifacts → `jev-ultimate-debug`。
 - **模拟器验证截图：** [Android 15 Emulator Regression](https://github.com/kitzhn/jev-chat-jarvis/actions/workflows/ui-emulator.yml) → Artifacts → `jev-ultimate-emulator-evidence`。
 
