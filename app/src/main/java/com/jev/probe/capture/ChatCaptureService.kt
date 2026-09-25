@@ -182,6 +182,18 @@ open class ChatCaptureService : AccessibilityService() {
             }
         }
 
+        val activeNow = rootInActiveWindow?.packageName?.toString()
+        if (activeNow == PKG_WECHAT) {
+            // Scrolling old history should not take screenshots. Editing the input
+            // box should not either; wait for the chat content itself to change.
+            if (event.source?.isEditable == true) return
+            when (type) {
+                AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED,
+                AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED -> maybeCaptureWeChat()
+            }
+            return
+        }
+
         when (type) {
             AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED,
             AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED,
