@@ -22,7 +22,7 @@ Scope: `app/src/main`, `app/src/debug`, `integration-fixture`, Android manifests
 | MAJOR-01 | MAJOR | **APPROVAL REQUIRED** | Async analysis | Old network results can paint a newer conversation because there is no analysis generation/session token. |
 | MAJOR-02 | MAJOR | **FIXED 2026-09-25** | API usage | Detail remains capped at 5000; evicted rows now roll into daily aggregates so current-day/month totals are retained. |
 | MAJOR-03 | MAJOR | **FIXED 2026-09-25** | Vision accounting | Vision prompt tokens are now marked unknown when provider usage is missing; Base64 length is never treated as billed image tokens. |
-| MAJOR-04 | MAJOR | **FIXED 2026-09-25** | Test architecture | `integration-fixture` is excluded from normal sync and included only when `JEV_INTEGRATION_FIXTURES=1` (or the matching Gradle property) is set. |
+| MAJOR-04 | MAJOR | **FIXED 2026-09-25** | Test architecture | `integration-fixture` is excluded from normal sync and included only when CI sets `JEV_INTEGRATION_FIXTURES=1`. |
 | MAJOR-05 | MAJOR / DEAD-CODE | **APPROVAL REQUIRED** | Accessibility legacy | Legacy `SelectToSpeakService` and `config_disguised.xml` remain in source although production Manifest now uses normal `ChatCaptureService`. They should be deleted after approval. |
 | MAJOR-06 | MAJOR | **FIXED 2026-09-25** | Usage privacy | Persisted base URLs now strip userinfo, query and fragment; legacy records are sanitized during the v2 usage-state migration. |
 | MAJOR-07 | MAJOR / SECURITY | **APPROVAL REQUIRED** | API key routing | Reply/vision keys inherit the judge key even when the target host is a different provider, which can send one provider's credential to another provider. |
@@ -107,7 +107,7 @@ When an API response lacks `usage`, fallback input tokens are estimated from the
 
 ### MAJOR-04 — integration fixture is part of the normal root project — FIXED
 
-**Resolution (approved 2026-09-25):** `integration-fixture` is included only with `JEV_INTEGRATION_FIXTURES=1` or `-PjevIntegrationFixtures=true`; the emulator workflow sets the CI environment flag.
+**Resolution (approved 2026-09-25):** `integration-fixture` is included only when `JEV_INTEGRATION_FIXTURES=1`; the emulator workflow sets this CI environment flag.
 
 **Files:**  
 - `settings.gradle.kts`
