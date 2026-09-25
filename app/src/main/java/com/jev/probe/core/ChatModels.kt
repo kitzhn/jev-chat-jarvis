@@ -3,7 +3,12 @@ package com.jev.probe.core
 import android.graphics.Rect
 
 /** One captured chat bubble. side is "me" (right) or "other" (left). */
-data class Msg(val side: String, val text: String)
+data class Msg(
+    val side: String,
+    val text: String,
+    /** Optional real speaker label for group chats; null when the app cannot expose it safely. */
+    val speaker: String? = null
+)
 
 /**
  * A bubble the node tree can locate but not read (Feishu draws its message text
@@ -28,7 +33,9 @@ data class ChatSnapshot(
     val title: String?,
     val messages: List<Msg>,
     val bubbleRects: List<BubbleRect> = emptyList(),
-    val note: String? = null
+    val note: String? = null,
+    /** "direct" | "group"; adapters may leave it direct when group state is unknown. */
+    val conversationKind: String = "direct"
 ) {
     val latestFrom: String? get() = messages.lastOrNull()?.side
 
@@ -62,6 +69,16 @@ enum class ReplyStrategy {
     UNKNOWN
 }
 
+enum class ConversationScene(val label: String) {
+    CASUAL("闲聊"),
+    COMFORT("安慰"),
+    CONFLICT("冲突"),
+    WORK("工作"),
+    MEETUP("约见"),
+    APOLOGY("道歉"),
+    UNKNOWN("未识别")
+}
+
 data class ReplyDraft(
     val text: String,
     val strategy: ReplyStrategy
@@ -75,5 +92,10 @@ data class RankedReply(
     /** Raw probability returned by the Jev ranking route. */
     val judgeProb: Double = prob,
     /** Relationship/profile multiplier applied before final normalization. */
-    val relationWeight: Double = 1.0
+    val relationWeight: Double = 1.0,
+    /** Learned multiplier from this user's actual past taps for this contact. */
+    val habitWeight: Double = 1.0,
+    /** Local scene multiplier, e.g. conflict / comfort / meetup. */
+    val sceneWeight: Double = 1.0,
+    val scene: ConversationScene = ConversationScene.UNKNOWN
 )
