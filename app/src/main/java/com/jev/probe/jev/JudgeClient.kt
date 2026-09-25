@@ -44,7 +44,8 @@ class JudgeClient(private val prefs: Prefs) {
                 latencyMs = System.currentTimeMillis() - start
             )
         } catch (e: Exception) {
-            Log.w(TAG, "judge failed: ${e.message}")
+            val status = (e as? ApiException)?.status
+            Log.w(TAG, "judge failed: ${e.javaClass.simpleName} status=${status ?: -1}")
             Analysis(null, null, null, null, null, null, null, emptyList(),
                 System.currentTimeMillis() - start, error = e.message ?: "判断接口请求失败")
         }
