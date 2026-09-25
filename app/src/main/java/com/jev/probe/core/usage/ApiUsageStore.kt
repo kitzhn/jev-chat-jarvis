@@ -401,6 +401,13 @@ object ApiUsageStore {
                     parseRollups(root.optJSONArray("rollups") ?: JSONArray())
                 )
             }
+            while (state.records.size > MAX_RECORDS) {
+                mergeIntoRollup(state.rollups, state.records.removeAt(0))
+                needsMigration = true
+            }
+            val rollupCount = state.rollups.size
+            pruneRollups(state.rollups)
+            if (state.rollups.size != rollupCount) needsMigration = true
             if (needsMigration) writeState(context, state)
             state
         }.getOrDefault(UsageState(mutableListOf(), mutableListOf()))
