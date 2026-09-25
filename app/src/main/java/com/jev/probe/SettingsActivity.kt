@@ -325,10 +325,13 @@ class SettingsActivity : AppCompatActivity() {
             Toast.makeText(this, "已套用。现在只需在判断接口填写 OpenRouter Key。", Toast.LENGTH_LONG).show()
             recreate()
         })
-        apiQuickCard.addView(cardBtn("回复切换为 DeepSeek 官方") {
+        apiQuickCard.addView(cardBtn("回复 + 视觉切换为 DeepSeek V4.1 Flash") {
             prefs.replyBaseUrl = Prefs.DEEPSEEK_BASE
             prefs.replyModel = Prefs.DEEPSEEK_MODEL
-            Toast.makeText(this, "已切换回复接口；请填写 DeepSeek Key。", Toast.LENGTH_SHORT).show()
+            prefs.visionBaseUrl = Prefs.DEEPSEEK_BASE
+            prefs.visionModel = Prefs.DEEPSEEK_MODEL
+            prefs.visionKey = ""
+            Toast.makeText(this, "已切换到 deepseek-flash；填写一个 DeepSeek Key 即可。", Toast.LENGTH_LONG).show()
             recreate()
         })
         apiQuickCard.addView(cardBtn("复制 API 配置模板（不含密钥）") {
