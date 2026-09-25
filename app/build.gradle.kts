@@ -25,8 +25,8 @@ android {
         applicationId = "io.github.kitzhn.jevultimate"
         minSdk = 30
         targetSdk = 35
-        versionCode = 20
-        versionName = "2.0.0"
+        versionCode = 21
+        versionName = "2.1.0"
 
         // ML Kit's bundled Chinese recognizer ships native libs for every ABI.
         // The target phone (and every phone this can run on: minSdk 30) is
