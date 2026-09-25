@@ -1,0 +1,67 @@
+name: Finalize privacy history cleanup
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: finalize-privacy-history
+  cancel-in-progress: false
+jobs:
+  rewrite:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out all branch and tag history
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+        with:
+          fetch-depth: 0
+          persist-credentials: true
+      - name: Clean reachable commit identity and finalize version tag
+        shell: bash
+        run: |
+          set -euo pipefail
+          while IFS= read -r remote_ref; do
+            [[ "$remote_ref" == "origin/HEAD" ]] && continue
+            local_branch="${remote_ref#origin/}"
+            [[ "$local_branch" == "main" ]] && continue
+            git branch --force "$local_branch" "$remote_ref"
+          done < <(git for-each-ref --format='%(refname:short)' refs/remotes/origin)
+
+          target_email="$(git show -s --format=%ae 6fbea2585e976c531594e2b68458487a4c92f939)"
+          [[ -n "$target_email" ]] || { echo "The historical identity reference is unavailable."; exit 1; }
+          export target_email
+          export replacement_email="224992667+kitzhn@users.noreply.github.com"
+
+          git filter-branch -f --env-filter '
+            if [ "${GIT_AUTHOR_EMAIL:-}" = "$target_email" ]; then
+              GIT_AUTHOR_EMAIL="$replacement_email"
+              export GIT_AUTHOR_EMAIL
+            fi
+            if [ "${GIT_COMMITTER_EMAIL:-}" = "$target_email" ]; then
+              GIT_COMMITTER_EMAIL="$replacement_email"
+              export GIT_COMMITTER_EMAIL
+            fi
+          ' -- --all
+
+          remaining=0
+          while IFS= read -r ref; do
+            if git log "$ref" --format='%ae%n%ce' | grep -Fqx "$target_email"; then
+              remaining=1
+            fi
+          done < <(git for-each-ref --format='%(refname)' refs/heads refs/tags)
+          if [[ "$remaining" -ne 0 ]] || git for-each-ref --format='%(taggeremail)' refs/tags | grep -Fqx "$target_email"; then
+            echo "A reachable identity remains."
+            exit 1
+          fi
+
+          git push --atomic --force origin '+refs/heads/*:refs/heads/*' '+refs/tags/*:refs/tags/*'
+
+          git for-each-ref --format='delete %(refname)' refs/original | git update-ref --stdin
+          git reflog expire --expire=now --all
+          git gc --prune=now
+
+          git rm .github/workflows/finalize-history-once.yml
+          git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' commit -m 'chore: remove temporary history finalization'
+          git push origin HEAD:refs/heads/main
+
+          git -c user.name='github-actions[bot]' -c user.email='41898282+github-actions[bot]@users.noreply.github.com' tag -fa v2.5.0 -m 'Jev Ultimate 2.5.0'
+          git push --force origin refs/tags/v2.5.0
