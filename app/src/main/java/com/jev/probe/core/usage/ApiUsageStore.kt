@@ -66,7 +66,7 @@ object ApiUsageStore {
         val usage = findUsage(response)
         val exactPrompt = usage?.optInt("prompt_tokens", -1) ?: -1
         val exactCompletion = usage?.optInt("completion_tokens", -1) ?: -1
-        val exact = exactPrompt >= 0 || exactCompletion >= 0
+        val exact = exactPrompt >= 0 && exactCompletion >= 0
 
         val prompt = if (exactPrompt >= 0) exactPrompt else estimateTokens(requestBody)
         val completion = if (exactCompletion >= 0) exactCompletion else estimateTokens(outputText)
