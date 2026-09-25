@@ -22,6 +22,7 @@ jobs:
           while IFS= read -r remote_ref; do
             [[ "$remote_ref" == "origin/HEAD" ]] && continue
             local_branch="${remote_ref#origin/}"
+            [[ "$local_branch" == "main" ]] && continue
             git branch --force "$local_branch" "$remote_ref"
           done < <(git for-each-ref --format='%(refname:short)' refs/remotes/origin)
 
