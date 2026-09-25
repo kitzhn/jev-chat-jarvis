@@ -4,7 +4,9 @@ set -euo pipefail
 PKG="io.github.kitzhn.jevultimate.debug"
 APK="app/build/outputs/apk/debug/app-debug.apk"
 
-mkdir -p screenshots demo/relations demo/logs
+mkdir -p screenshots demo/relations demo/logs integration-results
+
+trap 'code=$?; adb logcat -d -v time > integration-results/failure-logcat.txt 2>/dev/null || true; exit $code' ERR
 
 adb install -r "$APK"
 
@@ -243,3 +245,54 @@ adb shell am start -W -n "$PKG/com.jev.probe.ApiUsageActivity" >/dev/null
 sleep 1
 python3 /tmp/ui_text.py wait "API 消耗仪表盘"
 adb exec-out screencap -p > screenshots/10-api-usage-dashboard.png
+
+# ---------------------------------------------------------------------------
+# Cross-app integration fixtures. These are separate APKs whose runtime package
+# names match QQ / WeChat, so the real AccessibilityService and
+# NotificationListener exercise cross-process routing rather than an in-process
+# demo. They contain no Tencent code and need no account login.
+QQ_FIXTURE="integration-fixture/build/outputs/apk/qq/debug/integration-fixture-qq-debug.apk"
+WECHAT_FIXTURE="integration-fixture/build/outputs/apk/wechat/debug/integration-fixture-wechat-debug.apk"
+adb install -r "$QQ_FIXTURE"
+adb install -r "$WECHAT_FIXTURE"
+adb shell pm grant com.tencent.mm android.permission.POST_NOTIFICATIONS || true
+
+SERVICE="$PKG/com.jev.probe.capture.ChatCaptureService"
+adb shell settings put secure enabled_accessibility_services "$SERVICE"
+adb shell settings put secure accessibility_enabled 1
+adb shell cmd notification allow_listener "$PKG/com.jev.probe.capture.WeChatNotificationListener" 0 || true
+adb shell appops set "$PKG" SYSTEM_ALERT_WINDOW allow
+adb shell am start -W -n "$PKG/com.jev.probe.IntegrationSetupActivity" >/dev/null
+sleep 2
+
+# QQ: real package routing + resource-id adapter + group speaker extraction.
+adb logcat -c
+adb shell am start -W -n "com.tencent.mobileqq/com.jev.fixture.FixtureActivity" >/dev/null
+sleep 3
+adb logcat -d -v brief -s JEVASSIST:D > integration-results/qq-accessibility.txt
+grep -E 'snapshot\[com\.tencent\.mobileqq\].*n=3' integration-results/qq-accessibility.txt
+adb exec-out screencap -p > screenshots/11-qq-cross-app.png
+
+# Exercise the real fillInput path against QQ's separate-process EditText.
+adb shell am broadcast   -n "$PKG/com.jev.probe.IntegrationCommandReceiver"   -a "io.github.kitzhn.jevultimate.debug.FILL_FOR_TEST"   --es text "QQ跨进程填入成功" >/dev/null
+sleep 2
+python3 /tmp/ui_text.py wait "QQ跨进程填入成功"
+adb exec-out screencap -p > screenshots/12-qq-fill.png
+
+# WeChat: notification -> title gate -> Accessibility screenshot -> local ML Kit
+# OCR. Message nodes are not consumed by an adapter in this path.
+adb shell am start -W -n "$PKG/com.jev.probe.IntegrationSetupActivity" >/dev/null
+adb logcat -c
+adb shell am start -W -n "com.tencent.mm/com.jev.fixture.FixtureActivity" >/dev/null
+sleep 6
+adb logcat -d -v brief -s JEVASSIST:I > integration-results/wechat-ocr.txt
+grep -E 'ocr\[com\.tencent\.mm\] msgs=[1-9]' integration-results/wechat-ocr.txt
+adb exec-out screencap -p > screenshots/13-wechat-notification-ocr.png
+
+# Fill is still user-triggered; verify the same cross-app input path works.
+adb shell am broadcast   -n "$PKG/com.jev.probe.IntegrationCommandReceiver"   -a "io.github.kitzhn.jevultimate.debug.FILL_FOR_TEST"   --es text "微信跨进程填入成功" >/dev/null
+sleep 2
+python3 /tmp/ui_text.py wait "微信跨进程填入成功"
+adb exec-out screencap -p > screenshots/14-wechat-fill.png
+
+printf '%s\n'   'QQ: package routing + accessibility adapter + 3 messages + fill PASS'   'WeChat: notification gate + accessibility screenshot + local OCR + fill PASS'   > integration-results/summary.txt
