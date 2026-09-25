@@ -96,9 +96,10 @@ class OverlayDemoActivity : AppCompatActivity() {
             )
             overlay.showReplies(
                 listOf(
-                    RankedReply("可以呀，你定个时间，我们找个舒服的地方慢慢聊。", .48),
-                    RankedReply("好啊，那周末见～你想吃什么？", .32),
-                    RankedReply("行，我周末有空，到时候你把时间地点发我就好。", .20)
+                    RankedReply("可以呀，你定个时间，我们找个舒服的地方慢慢聊。", .36),
+                    RankedReply("好啊，那周末见～你想吃什么？", .28),
+                    RankedReply("行，我周末有空，到时候你把时间地点发我就好。", .21),
+                    RankedReply("那就周六？我来定地方，你看可以吗？", .15)
                 ),
                 null
             ) { chosen ->
