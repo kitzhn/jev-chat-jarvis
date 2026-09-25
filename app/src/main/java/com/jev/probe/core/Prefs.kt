@@ -2,6 +2,7 @@ package com.jev.probe.core
 
 import android.content.Context
 import android.util.Log
+import java.net.URI
 
 /**
  * App-private config store. Holds the three API routes (judge / reply / vision),
@@ -275,11 +276,41 @@ class Prefs(context: Context, prefsName: String = PREFS_MAIN) {
 
     // ------------------------------------------------------------- helpers
 
-    /** Reply route key, falling back to the judge key. */
-    fun effectiveReplyKey(): String = replyKey.ifBlank { judgeKey }
+    /**
+     * Reply key inheritance is host-aware: a judge credential is reused only
+     * when judge and reply resolve to the same normalized host. This prevents an
+     * OpenRouter key, for example, from being sent to DeepSeek after only the
+     * reply endpoint is switched.
+     */
+    fun effectiveReplyKey(): String {
+        if (replyKey.isNotBlank()) return replyKey
+        return if (sameCredentialHost(replyEndpoint(), judgeEndpoint())) judgeKey else ""
+    }
 
-    /** Vision route key, falling back to reply then judge. */
-    fun effectiveVisionKey(): String = visionKey.ifBlank { effectiveReplyKey() }
+    /** Vision follows the same rule: explicit key first, then same-host reply/judge. */
+    fun effectiveVisionKey(): String {
+        if (visionKey.isNotBlank()) return visionKey
+        if (replyKey.isNotBlank() && sameCredentialHost(visionEndpoint(), replyEndpoint())) return replyKey
+        if (sameCredentialHost(visionEndpoint(), judgeEndpoint())) return judgeKey
+        return ""
+    }
+
+    private fun sameCredentialHost(a: String, b: String): Boolean {
+        fun hostOf(raw: String): String? = runCatching {
+            val uri = URI(raw.trim())
+            val scheme = uri.scheme?.lowercase() ?: return@runCatching null
+            val host = uri.host?.lowercase() ?: return@runCatching null
+            val port = if (uri.port >= 0) uri.port else when (scheme) {
+                "https" -> 443
+                "http" -> 80
+                else -> -1
+            }
+            "$scheme://$host:$port"
+        }.getOrNull()
+        val ah = hostOf(a)
+        val bh = hostOf(b)
+        return ah != null && ah == bh
+    }
 
     /** Full POST URL for the Jev decisions call, per provider. */
     fun judgeEndpoint(): String {
