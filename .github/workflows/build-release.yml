@@ -7,10 +7,6 @@ on:
         description: "Release tag（留空则自动使用 app versionName，如 v2.4.0）"
         required: false
         type: string
-  push:
-    branches: [main]
-    paths:
-      - ".github/workflows/build-release.yml"
 
 permissions:
   contents: write
@@ -45,10 +41,17 @@ jobs:
           JEV_KEY_ALIAS: ${{ secrets.JEV_KEY_ALIAS }}
           JEV_KEY_PASSWORD: ${{ secrets.JEV_KEY_PASSWORD }}
         run: |
-          test -n "$JEV_KEYSTORE_B64" || (echo "Missing JEV_KEYSTORE_B64" && exit 1)
-          test -n "$JEV_STORE_PASSWORD" || (echo "Missing JEV_STORE_PASSWORD" && exit 1)
-          test -n "$JEV_KEY_ALIAS" || (echo "Missing JEV_KEY_ALIAS" && exit 1)
-          test -n "$JEV_KEY_PASSWORD" || (echo "Missing JEV_KEY_PASSWORD" && exit 1)
+          missing=0
+          for name in JEV_KEYSTORE_B64 JEV_STORE_PASSWORD JEV_KEY_ALIAS JEV_KEY_PASSWORD; do
+            if [ -z "${!name}" ]; then
+              echo "::error::Missing repository secret: $name"
+              missing=1
+            fi
+          done
+          if [ "$missing" -ne 0 ]; then
+            echo "Configure the four Actions secrets once, then rerun this workflow."
+            exit 1
+          fi
 
       - name: Prepare release keystore
         shell: bash
