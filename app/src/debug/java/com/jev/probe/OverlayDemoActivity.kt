@@ -12,11 +12,14 @@ import android.widget.Space
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import com.jev.probe.core.Analysis
+import com.jev.probe.core.ChatSnapshot
 import com.jev.probe.core.Choice
+import com.jev.probe.core.Msg
 import com.jev.probe.core.RankedReply
 import com.jev.probe.core.ReplyStrategy
 import com.jev.probe.core.Score
 import com.jev.probe.core.kb.Contact
+import com.jev.probe.jev.ConversationSceneDetector
 import com.jev.probe.jev.RelationshipStrategyPolicy
 import com.jev.probe.overlay.OverlayController
 
@@ -106,7 +109,13 @@ class OverlayDemoActivity : AppCompatActivity() {
                 trust = 80,
                 closeness = 90,
                 communicationStyle = "喜欢轻松自然、带一点玩笑的聊天",
-                boundaries = "不喜欢被催，也不喜欢连续追问"
+                boundaries = "不喜欢被催，也不喜欢连续追问",
+                strategySelections = mapOf(
+                    "playful" to 20,
+                    "warm" to 6,
+                    "steady" to 3,
+                    "proactive" to 1
+                )
             )
             val equalJudgeScores = listOf(
                 RankedReply(
@@ -122,11 +131,20 @@ class OverlayDemoActivity : AppCompatActivity() {
                     "那就周六？我来定地方，你看可以吗？",
                     .25, ReplyStrategy.PROACTIVE, .25, 1.0)
             )
+            val demoSnapshot = ChatSnapshot(
+                title = "演示联系人 A",
+                messages = listOf(
+                    Msg("other", "周末有空一起吃饭吗？"),
+                    Msg("me", "应该有空，怎么啦？"),
+                    Msg("other", "想找你聊聊天，顺便吃个饭。")
+                )
+            )
+            val scene = ConversationSceneDetector.detect(demoSnapshot)
             overlay.showReplies(
-                RelationshipStrategyPolicy.rerank(equalJudgeScores, demoContact),
+                RelationshipStrategyPolicy.rerank(equalJudgeScores, demoContact, scene),
                 null
             ) { chosen ->
-                input.setText(chosen)
+                input.setText(chosen.text)
                 input.setSelection(input.text.length)
             }
         }, 700)
