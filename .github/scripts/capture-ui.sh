@@ -87,9 +87,26 @@ import subprocess, xml.etree.ElementTree as ET, re, sys, time
 mode, target = sys.argv[1], sys.argv[2]
 
 def dump():
-    subprocess.run(["adb","shell","uiautomator","dump","/sdcard/window.xml"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    subprocess.run(["adb","pull","/sdcard/window.xml","/tmp/window.xml"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-    return ET.parse("/tmp/window.xml").getroot()
+    import os
+    for _ in range(8):
+        try:
+            if os.path.exists("/tmp/window.xml"):
+                os.remove("/tmp/window.xml")
+            d = subprocess.run(
+                ["adb","shell","uiautomator","dump","/sdcard/window.xml"],
+                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            if d.returncode != 0:
+                time.sleep(.5)
+                continue
+            p = subprocess.run(
+                ["adb","pull","/sdcard/window.xml","/tmp/window.xml"],
+                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            if p.returncode == 0 and os.path.exists("/tmp/window.xml"):
+                return ET.parse("/tmp/window.xml").getroot()
+        except Exception:
+            pass
+        time.sleep(.5)
+    raise RuntimeError("uiautomator window dump not ready")
 
 for attempt in range(10):
     root = dump()
@@ -119,6 +136,7 @@ PY
 
 adb shell am force-stop "$PKG"
 adb shell monkey -p "$PKG" -c android.intent.category.LAUNCHER 1 >/dev/null
+sleep 2
 python3 /tmp/ui_text.py wait "Jev Ultimate"
 adb exec-out screencap -p > screenshots/01-home.png
 
