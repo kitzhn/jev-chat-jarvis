@@ -51,6 +51,8 @@ data class ApiUsageBreakdown(
  */
 object ApiUsageStore {
     private val lock = Any()
+    // REVIEW(MAJOR-02): bounded detail records can undercount a busy "current month".
+    // See docs/CODE_REVIEW_2026-09-25.md before changing storage semantics.
     private const val MAX_RECORDS = 5000
     private const val USD_CNY = 6.71
 
@@ -68,6 +70,8 @@ object ApiUsageStore {
         val exactCompletion = usage?.optInt("completion_tokens", -1) ?: -1
         val exact = exactPrompt >= 0 && exactCompletion >= 0
 
+        // REVIEW(MAJOR-03): for vision requests, requestBody may contain Base64 image
+        // data, so this fallback is not a trustworthy billed-token estimate.
         val prompt = if (exactPrompt >= 0) exactPrompt else estimateTokens(requestBody)
         val completion = if (exactCompletion >= 0) exactCompletion else estimateTokens(outputText)
 
