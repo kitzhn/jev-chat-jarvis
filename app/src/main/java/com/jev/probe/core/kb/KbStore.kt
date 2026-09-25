@@ -208,6 +208,11 @@ class KbStore private constructor(context: Context) {
         saveContact(current.copy(strategySelections = next))
     }
 
+    fun clearStrategySelections(contactId: String): Boolean = synchronized(lock) {
+        val current = loadContacts().firstOrNull { it.id == contactId } ?: return@synchronized false
+        saveContact(current.copy(strategySelections = emptyMap()))
+    }
+
     fun linkIdentity(
         contactId: String,
         app: String,
