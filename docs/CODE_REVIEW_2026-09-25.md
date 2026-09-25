@@ -28,7 +28,8 @@ Scope: `app/src/main`, `app/src/debug`, `integration-fixture`, Android manifests
 | MAJOR-07 | MAJOR / SECURITY | **APPROVAL REQUIRED** | API key routing | Reply/vision keys inherit the judge key even when the target host is a different provider, which can send one provider's credential to another provider. |
 | MAJOR-08 | MAJOR / SECURITY | **APPROVAL REQUIRED** | Transport | Custom API URLs are not restricted to HTTPS; a user can configure an `http://` endpoint and send bearer credentials/content in plaintext. |
 | MAJOR-09 | MAJOR | **APPROVAL REQUIRED** | DeepSeek behavior/cost | Official `deepseek-flash` defaults to high-effort thinking; current short-reply/OCR calls do not disable it, so `temperature` is ignored and reasoning tokens can add latency/cost. |
-| MEDIUM-01 | MEDIUM | OPEN | Reply parsing | Malformed model output is padded with repeated `（稍等，我看下）`, producing duplicate strategy cards instead of surfacing a generation problem. |
+| MAJOR-10 | MAJOR / SECURITY | **APPROVAL REQUIRED** | Debug distribution | Debug integration receiver/activity are exported and therefore unsafe to ship as the APK given to friends. |
+| MEDIUM-01 | MEDIUM | **FIXED** | Reply parsing | Incomplete/malformed candidate output now surfaces a retryable generation error instead of duplicate filler cards. |
 | MEDIUM-02 | MEDIUM | FIXED | API usage | A request was marked “exact” if only one of prompt/completion counts was exact. Now both are required. |
 | MEDIUM-03 | MEDIUM | FIXED | Jev retry | Knowledge-context fallback retried all 4xx, including 401/403/429. Now only schema-like 400/422 are retried. |
 | MEDIUM-04 | MEDIUM | FIXED | Log privacy | Conversation titles and remote API error snippets are no longer written to logcat; logs keep only non-content metadata/status. |
@@ -202,11 +203,24 @@ Current Jev reply generation sends `temperature=0.85` expecting varied GalGame c
 
 **Approval required:** yes. This changes model behavior, cost and potentially reply quality.
 
+### MAJOR-10 — exported CI controls are unsafe in distributed Debug APKs
+
+**Files:**  
+- `app/src/debug/AndroidManifest.xml`
+- `app/src/debug/java/com/jev/probe/IntegrationCommandReceiver.kt`
+- `app/src/debug/java/com/jev/probe/IntegrationSetupActivity.kt`
+
+The emulator needs externally launchable controls, so the Debug manifest exports them. However the current downloadable artifact is also a Debug APK. Any other app on the same phone can therefore invoke the exported broadcast receiver and ask Jev to exercise its fill path, or invoke the setup activity that alters test settings.
+
+**Recommended fix:** separate CI instrumentation from the user-facing Debug build. Preferred design is an `integrationTest` product flavor/build type (or a dedicated test APK) that alone contains/export these controls. The ordinary Debug APK and Release APK should not contain them.
+
+**Approval required:** yes. This changes build variants and CI artifact layout.
+
 ---
 
 ## MEDIUM / MINOR open items
 
-### MEDIUM-01 — duplicate filler replies on malformed generation
+### MEDIUM-01 — duplicate filler replies on malformed generation — FIXED
 
 **File:** `ReplyClient.kt`
 
@@ -274,4 +288,5 @@ No MAJOR item below should be implemented until explicitly approved:
 - [ ] MAJOR-07 — make API key inheritance provider/host-aware.
 - [ ] MAJOR-08 — require HTTPS or explicit local-network opt-in for custom endpoints.
 - [ ] MAJOR-09 — make DeepSeek thinking mode explicit/configurable for reply and vision calls.
+- [ ] MAJOR-10 — move exported CI controls out of the distributable Debug APK.
 
