@@ -34,6 +34,7 @@ Scope: `app/src/main`, `app/src/debug`, `integration-fixture`, Android manifests
 | MINOR-04 | MINOR | FIXED | WeChat capture | Removed unused `lastWechatNotificationAt` field. |
 | MINOR-05 | MINOR / DEAD-CODE | OPEN | Debug naming | `V23FeatureDemoActivity` and one script comment still use the v2.3 name although current app is v2.4. No runtime effect. |
 | MINOR-06 | MINOR | OPEN | Usage I/O | API usage rewrites/parses the full JSON file on every request. Fine for light use, but inefficient near the record cap. |
+| MINOR-07 | MINOR / DUPLICATE-TEST | OPEN | Debug tests | `AdaptiveModelDemoActivity` and `V23FeatureDemoActivity` substantially overlap; the latter writes demo contacts without cleanup. |
 | TEST-01 | TEST-GAP | IN PROGRESS | QQ | CI now uses a separate APK with runtime package `com.tencent.mobileqq` to test package routing, resource-id capture, group messages, and cross-process input fill. |
 | TEST-02 | TEST-GAP | IN PROGRESS | WeChat | CI now uses a separate APK with runtime package `com.tencent.mm` to test notification gate → Accessibility screenshot → local OCR → input fill. This is not a substitute for a real Tencent ARM64 client. |
 | TEST-03 | TEST-GAP | OPEN | Real devices | Real QQ / WeChat compatibility still needs ARM64 device regression because CI emulator is x86_64. |
@@ -156,6 +157,12 @@ Debug-only file/class names and one script comment still say v2.3. This is not a
 ### MINOR-06 — usage log O(n) rewrite
 
 Every API usage record parses and rewrites the whole JSON array. With light personal use this is acceptable, but it scales poorly toward the 5000-record cap. This can be solved together with MAJOR-02.
+
+### MINOR-07 — overlapping debug integration activities
+
+`AdaptiveModelDemoActivity` and `V23FeatureDemoActivity` both exercise group-person context, scene detection, strategy learning, and WeChat notification integration. `V23FeatureDemoActivity` also writes demo contacts to the Debug knowledge store without deleting them.
+
+Recommended cleanup after the current regression stabilizes: keep one canonical integration page and remove/merge the other. No Release runtime impact.
 
 ---
 
