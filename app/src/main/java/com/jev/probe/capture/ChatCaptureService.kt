@@ -29,11 +29,10 @@ import java.util.concurrent.Executors
 import java.util.concurrent.RejectedExecutionException
 
 /**
- * The live capture service (registered under a disguised class name so WeChat
- * exposes its node tree — see the disguised subclass). It reads whichever
- * adapted chat app is in the foreground, detects a new incoming message from the
- * other person, runs Jev analysis off the main thread, and drives the floating
- * overlay.
+ * The live capture service. It reads supported apps through ordinary
+ * accessibility nodes; WeChat is handled separately through opt-in
+ * notification-triggered screenshot + on-device OCR. It detects a new incoming
+ * message, runs Jev analysis off the main thread, and drives the floating overlay.
  *
  * Per-app node rules live in [ChatAppAdapter] implementations; everything here
  * is app-agnostic.
