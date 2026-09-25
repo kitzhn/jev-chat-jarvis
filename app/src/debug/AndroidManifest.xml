@@ -14,27 +14,27 @@
         </receiver>
         <activity
             android:name="com.jev.probe.KnowledgeActivity"
-            android:exported="true"
+            android:exported="${integrationControlsExported}"
             tools:replace="android:exported" />
         <activity
             android:name="com.jev.probe.SettingsActivity"
-            android:exported="true"
+            android:exported="${integrationControlsExported}"
             tools:replace="android:exported" />
         <activity
             android:name="com.jev.probe.ApiUsageActivity"
-            android:exported="true"
+            android:exported="${integrationControlsExported}"
             tools:replace="android:exported" />
         <activity
             android:name="com.jev.probe.OverlayDemoActivity"
-            android:exported="true" />
+            android:exported="${integrationControlsExported}" />
         <activity
             android:name="com.jev.probe.WeChatOcrDemoActivity"
-            android:exported="true" />
+            android:exported="${integrationControlsExported}" />
         <activity
             android:name="com.jev.probe.AdaptiveModelDemoActivity"
-            android:exported="true" />
+            android:exported="${integrationControlsExported}" />
         <activity
             android:name="com.jev.probe.V23FeatureDemoActivity"
-            android:exported="true" />
+            android:exported="${integrationControlsExported}" />
     </application>
 </manifest>
