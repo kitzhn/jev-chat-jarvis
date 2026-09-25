@@ -437,17 +437,24 @@ class OverlayController(private val ctx: Context) {
         a.tensionResolved?.let { if (it >= 0.7) views.add(line("✓ 紧张已缓解", "#16A34A", 12f)) }
 
         views.add(divider())
-        views.add(line("候选回复（Jev 排序）", "#9CA3AF", 12f))
+        views.add(dialogueHeader(a.rankedReplies.size, generating))
         if (generating) {
-            views.add(hint("生成中…"))
+            views.add(hint("正在生成对话分支…"))
         } else {
             val fill = lastFill ?: {}
-            a.rankedReplies.forEachIndexed { i, r ->
-                views.add(replyCard(i + 1, r.text, (r.prob * 100).roundToInt(), fill))
+            a.rankedReplies.take(4).forEachIndexed { i, r ->
+                views.add(dialogueOptionCard(
+                    index = i,
+                    text = r.text,
+                    pct = (r.prob * 100).roundToInt(),
+                    onFill = fill
+                ))
             }
             if (a.rankedReplies.isEmpty()) {
                 val msg = replyError?.let { "回复接口出错：$it" } ?: "（未生成候选回复）"
                 views.add(hint(msg))
+            } else {
+                views.add(hint("轻触一个选项 → 自动写入聊天输入框；不会自动发送"))
             }
         }
         views.add(reAnalyzeBtn())
@@ -475,31 +482,117 @@ class OverlayController(private val ctx: Context) {
         return row
     }
 
-    private fun replyCard(rank: Int, text: String, pct: Int, onFill: (String) -> Unit): View {
-        val top = rank == 1
-        val cardBg = if (top) Color.parseColor("#EAF1FF") else Color.parseColor("#F3F4F6")
-        val c = LinearLayout(ctx).apply {
-            orientation = LinearLayout.VERTICAL
-            background = card(12, cardBg)
-            setPadding(dp(10), dp(8), dp(10), dp(8))
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT
-            ).apply { topMargin = dp(6) }
+    private fun dialogueHeader(count: Int, generating: Boolean): View {
+        val row = LinearLayout(ctx).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            setPadding(0, dp(2), 0, dp(3))
         }
-        c.addView(TextView(ctx).apply {
-            this.text = "#$rank · ${pct}%"; setTextColor(Color.parseColor("#3A7AFE")); textSize = 11f
+        row.addView(TextView(ctx).apply {
+            text = "DIALOGUE SELECT"
+            setTextColor(Color.parseColor("#3A7AFE"))
+            textSize = 12f
+            setTypeface(Typeface.MONOSPACE, Typeface.BOLD)
+            layoutParams = LinearLayout.LayoutParams(
+                0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
+        })
+        row.addView(TextView(ctx).apply {
+            text = if (generating) "SYNC…" else (count.coerceAtMost(4).toString() + " OPTIONS")
+            setTextColor(Color.parseColor("#9CA3AF"))
+            textSize = 10f
+            setTypeface(Typeface.MONOSPACE, Typeface.BOLD)
+        })
+        return row
+    }
+
+    /**
+     * GalGame-style dialogue branch. The whole card is the action target:
+     * one tap fills the underlying chat input and collapses the overlay so the
+     * user can review the text before manually pressing Send.
+     */
+    private fun dialogueOptionCard(
+        index: Int,
+        text: String,
+        pct: Int,
+        onFill: (String) -> Unit
+    ): View {
+        val labels = listOf("A", "B", "C", "D")
+        val accent = when (index) {
+            0 -> Color.parseColor("#3A7AFE")
+            1 -> Color.parseColor("#6D5DFB")
+            2 -> Color.parseColor("#0EA5A8")
+            else -> Color.parseColor("#D97706")
+        }
+        val box = LinearLayout(ctx).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+            background = GradientDrawable().apply {
+                cornerRadius = dp(12).toFloat()
+                setColor(Color.parseColor("#F8FAFF"))
+                setStroke(dp(if (index == 0) 2 else 1), accent)
+            }
+            setPadding(dp(10), dp(9), dp(10), dp(9))
+            layoutParams = LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT
+            ).apply { topMargin = dp(7) }
+            elevation = if (index == 0) dp(2).toFloat() else 0f
+            isClickable = true
+            setOnClickListener {
+                android.util.Log.d("JEVASSIST", "dialogue option tapped index=" + index)
+                onFill(text)
+                if (expanded) toggle()
+            }
+            setOnLongClickListener {
+                copy(text)
+                true
+            }
+        }
+
+        box.addView(TextView(ctx).apply {
+            this.text = labels.getOrElse(index) { "?" }
+            textSize = 13f
+            gravity = Gravity.CENTER
+            setTypeface(Typeface.MONOSPACE, Typeface.BOLD)
+            setTextColor(Color.WHITE)
+            background = GradientDrawable().apply {
+                shape = GradientDrawable.OVAL
+                setColor(accent)
+            }
+            layoutParams = LinearLayout.LayoutParams(dp(32), dp(32)).apply {
+                rightMargin = dp(9)
+            }
+        })
+
+        val middle = LinearLayout(ctx).apply {
+            orientation = LinearLayout.VERTICAL
+            layoutParams = LinearLayout.LayoutParams(
+                0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
+        }
+        middle.addView(TextView(ctx).apply {
+            this.text = if (index == 0) "推荐选项" else "备选 " + labels.getOrElse(index) { "?" }
+            setTextColor(accent)
+            textSize = 10.5f
             setTypeface(typeface, Typeface.BOLD)
         })
-        c.addView(TextView(ctx).apply {
-            this.text = text; setTextColor(Color.parseColor("#111827")); textSize = 14f
-            setPadding(0, dp(3), 0, dp(7)); setLineSpacing(dp(2).toFloat(), 1f)
+        middle.addView(TextView(ctx).apply {
+            this.text = text
+            setTextColor(Color.parseColor("#111827"))
+            textSize = 13.5f
+            setPadding(0, dp(2), dp(4), 0)
+            setLineSpacing(dp(2).toFloat(), 1f)
         })
-        val btns = LinearLayout(ctx).apply { orientation = LinearLayout.HORIZONTAL }
-        btns.addView(pill("复制", false) { copy(text) })
-        // Fill, then collapse so the input box + keyboard are visible to review/send.
-        btns.addView(pill("填入", true) { android.util.Log.d("JEVASSIST", "overlay: fill tapped"); onFill(text); if (expanded) toggle() })
-        c.addView(btns)
-        return c
+        box.addView(middle)
+
+        box.addView(TextView(ctx).apply {
+            this.text = (if (pct > 0) pct.toString() + "%" else "→")
+            setTextColor(accent)
+            textSize = 11f
+            setTypeface(typeface, Typeface.BOLD)
+            gravity = Gravity.CENTER
+        })
+
+        return box
     }
 
     private fun pill(label: String, primary: Boolean, onClick: () -> Unit) = TextView(ctx).apply {
