@@ -52,8 +52,13 @@ object ContextBuilder {
         val contact = speakerContact ?: conversationContact
 
         // 2. History — recorded and injected only with the user's opt-in.
+        val historySnapshot = if (inferredGroup && !speakerName.isNullOrBlank()) {
+            snapshot.copy(messages = snapshot.messages.filter {
+                it.side == "me" || it.speaker == speakerName
+            })
+        } else snapshot
         val history = if (prefs.contextEnabled && contact != null)
-            historyFor(store, contact, snapshot, app, prefs) else emptyList()
+            historyFor(store, contact, historySnapshot, app, prefs) else emptyList()
 
         // 3. Notes — always-on ones plus keyword hits.
         val enabled = store.notes().filter { it.enabled }
