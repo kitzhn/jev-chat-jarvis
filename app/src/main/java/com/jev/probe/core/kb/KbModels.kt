@@ -24,7 +24,9 @@ data class Note(
 data class PlatformIdentity(
     val app: String,
     val title: String,
-    val label: String = ""
+    val label: String = "",
+    /** Optional conversation scope for group-member identities. Blank = global/direct identity. */
+    val scope: String = ""
 )
 
 /** One manual affinity change event. */
