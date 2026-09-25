@@ -4,10 +4,10 @@
     <application>
         <activity
             android:name="com.jev.probe.IntegrationSetupActivity"
-            android:exported="true" />
+            android:exported="${integrationControlsExported}" />
         <receiver
             android:name="com.jev.probe.IntegrationCommandReceiver"
-            android:exported="true">
+            android:exported="${integrationControlsExported}">
             <intent-filter>
                 <action android:name="io.github.kitzhn.jevultimate.debug.FILL_FOR_TEST" />
             </intent-filter>
