@@ -11,6 +11,7 @@ import android.os.SystemClock
 import android.util.Log
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
+import com.jev.probe.BuildConfig
 import com.jev.probe.KnowledgeActivity
 import com.jev.probe.capture.ocr.MlKitOcr
 import com.jev.probe.capture.ocr.OcrChatGrouper
@@ -169,6 +170,7 @@ open class ChatCaptureService : AccessibilityService() {
         // bubble for whatever chat is already open, so it comes back on its own
         // instead of waiting for the user to scroll.
         main.postDelayed({ if (prefs.enabled) runCatching { maybeCapture() } }, 900)
+        if (BuildConfig.DEBUG) debugInstance = this
         Log.i(TAG, "capture service connected")
     }
 
@@ -774,10 +776,21 @@ open class ChatCaptureService : AccessibilityService() {
         main.removeCallbacks(wechatAutoOcr)
         overlay?.hide()
         overlay = null
+        if (debugInstance === this) debugInstance = null
         worker.shutdownNow()
     }
 
     companion object {
+        @Volatile private var debugInstance: ChatCaptureService? = null
+
+        /** Debug builds only: exercise the real cross-app fill path from CI. */
+        fun debugFillForTest(text: String): Boolean {
+            if (!BuildConfig.DEBUG || text.isBlank()) return false
+            val service = debugInstance ?: return false
+            service.fillInput(text)
+            return true
+        }
+
         private const val TAG = "JEVASSIST"
 
         private const val PKG_WECHAT = "com.tencent.mm"
