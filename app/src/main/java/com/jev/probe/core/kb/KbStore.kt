@@ -137,9 +137,14 @@ class KbStore private constructor(context: Context) {
         val list = loadContacts()
         val i = list.indexOfFirst { it.id == c.id }
         val identities = c.identities
-            .map { it.copy(app = it.app.trim(), title = it.title.trim(), label = it.label.trim()) }
+            .map { it.copy(
+                app = it.app.trim(),
+                title = it.title.trim(),
+                label = it.label.trim(),
+                scope = it.scope.trim()
+            ) }
             .filter { it.title.isNotBlank() }
-            .distinctBy { it.app + "\u0000" + normalizeName(it.title) }
+            .distinctBy { it.app + "\u0000" + normalizeName(it.scope) + "\u0000" + normalizeName(it.title) }
         val stamped = c.copy(
             identities = identities,
             affection = AffectionScale.clamp(c.affection),
@@ -266,7 +271,7 @@ class KbStore private constructor(context: Context) {
                 .map { it.trim() }.filter { it.isNotEmpty() }.distinct(),
             apps = (target.apps + source.apps).distinct(),
             identities = (target.identities + source.identities).distinctBy {
-                it.app + "\u0000" + normalizeName(it.title)
+                it.app + "\u0000" + normalizeName(it.scope) + "\u0000" + normalizeName(it.title)
             },
             relationship = target.relationship.ifBlank { source.relationship },
             relationshipStage = target.relationshipStage.ifBlank { source.relationshipStage },
@@ -370,7 +375,9 @@ class KbStore private constructor(context: Context) {
             if (app.isNotBlank()) {
                 loadContacts().firstOrNull { c ->
                     c.identities.any { identity ->
-                        identity.app == app && normalizeName(identity.title) == want
+                        identity.app == app &&
+                            identity.scope.isBlank() &&
+                            normalizeName(identity.title) == want
                     }
                 }?.let { return it }
             }
@@ -728,7 +735,8 @@ class KbStore private constructor(context: Context) {
                         put(JSONObject()
                             .put("app", identity.app)
                             .put("title", identity.title)
-                            .put("label", identity.label))
+                            .put("label", identity.label)
+                            .put("scope", identity.scope))
                     }
                 })
                 .put("relationship", c.relationship)
@@ -802,7 +810,8 @@ class KbStore private constructor(context: Context) {
                 out.add(PlatformIdentity(
                     app = o.optString("app").trim(),
                     title = title,
-                    label = o.optString("label").trim()
+                    label = o.optString("label").trim(),
+                    scope = o.optString("scope").trim()
                 ))
             }
         }
