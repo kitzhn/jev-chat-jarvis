@@ -24,6 +24,7 @@ Scope: `app/src/main`, `app/src/debug`, `integration-fixture`, Android manifests
 | MAJOR-03 | MAJOR | **APPROVAL REQUIRED** | Vision accounting | Fallback token estimation counts Base64 request length when a vision provider omits usage; this can substantially overestimate image cost. |
 | MAJOR-04 | MAJOR | **APPROVAL REQUIRED** | Test architecture | `integration-fixture` is always included in the root Gradle project and owns QQ/WeChat package names for CI. Production workflows are scoped, but the fixture remains part of normal project sync. |
 | MAJOR-05 | MAJOR / DEAD-CODE | **APPROVAL REQUIRED** | Accessibility legacy | Legacy `SelectToSpeakService` and `config_disguised.xml` remain in source although production Manifest now uses normal `ChatCaptureService`. They should be deleted after approval. |
+| MAJOR-06 | MAJOR | **APPROVAL REQUIRED** | Usage privacy | Usage records persist the raw custom `baseUrl`; a user who embeds credentials in URL query/userinfo could indirectly persist a secret in `api_usage.json`. |
 | MEDIUM-01 | MEDIUM | OPEN | Reply parsing | Malformed model output is padded with repeated `（稍等，我看下）`, producing duplicate strategy cards instead of surfacing a generation problem. |
 | MEDIUM-02 | MEDIUM | FIXED | API usage | A request was marked “exact” if only one of prompt/completion counts was exact. Now both are required. |
 | MEDIUM-03 | MEDIUM | FIXED | Jev retry | Knowledge-context fallback retried all 4xx, including 401/403/429. Now only schema-like 400/422 are retried. |
@@ -117,6 +118,25 @@ The production Manifest now registers the normal `ChatCaptureService`, and WeCha
 
 **Approval required:** yes, because this is security-sensitive cleanup and intentionally removes a prior compatibility mechanism.
 
+### MAJOR-06 — raw custom base URL can persist embedded credentials
+
+**File:**  
+- `app/src/main/java/com/jev/probe/core/usage/ApiUsageStore.kt`
+
+Normal API keys are sent in the Authorization header and are not written to usage data. However, the usage record currently stores the supplied `baseUrl` verbatim.
+
+A custom endpoint such as:
+
+```
+https://example.invalid/v1?key=SECRET
+```
+
+would therefore persist the query string in `files/usage/api_usage.json`. The same concern applies to URL userinfo.
+
+**Recommended fix:** sanitize the URL before persistence: remove userinfo, query and fragment, retaining only scheme + host + port + non-sensitive path/provider identity.
+
+**Approval required:** yes. This changes persisted audit data and the privacy contract.
+
 ---
 
 ## MEDIUM / MINOR open items
@@ -179,4 +199,5 @@ No MAJOR item below should be implemented until explicitly approved:
 - [ ] MAJOR-03 — change vision missing-usage accounting semantics.
 - [ ] MAJOR-04 — conditionally include the integration fixture module.
 - [ ] MAJOR-05 — delete legacy disguised accessibility artifacts.
+- [ ] MAJOR-06 — sanitize persisted API base URLs.
 
