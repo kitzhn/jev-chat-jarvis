@@ -49,6 +49,7 @@ class KnowledgeActivity : AppCompatActivity() {
     private var tab = 0
     private var pendingLinkApp: String = ""
     private var pendingLinkTitle: String = ""
+    private var pendingLinkScope: String = ""
 
     private val accent = Color.parseColor("#3A7AFE")
     private val ink = Color.parseColor("#111827")
@@ -64,6 +65,7 @@ class KnowledgeActivity : AppCompatActivity() {
         store = KbStore.get(this)
         pendingLinkApp = intent.getStringExtra(EXTRA_LINK_APP).orEmpty()
         pendingLinkTitle = intent.getStringExtra(EXTRA_LINK_TITLE).orEmpty()
+        pendingLinkScope = intent.getStringExtra(EXTRA_LINK_SCOPE).orEmpty()
         if (pendingLinkTitle.isNotBlank()) tab = 1
         window.decorView.setBackgroundColor(Color.parseColor("#F2F3F5"))
 
@@ -257,10 +259,16 @@ class KnowledgeActivity : AppCompatActivity() {
     private fun linkBanner(): View = card().apply {
         addView(text("关联当前会话", 14f, ink, bold = true))
         addView(text(
-            "${appLabel(pendingLinkApp)} · $pendingLinkTitle",
+            buildString {
+                append(appLabel(pendingLinkApp)).append(" · ").append(pendingLinkTitle)
+                if (pendingLinkScope.isNotBlank()) append("  @  ").append(pendingLinkScope)
+            },
             13f, accent, bold = true).apply { setPadding(0, dp(5), 0, 0) })
         addView(text(
-            "在下面选择现实中的同一个联系人。绑定后，不同 App 的聊天会共用同一份画像、历史和关系数据。",
+            if (pendingLinkScope.isBlank())
+                "在下面选择现实中的同一个联系人。绑定后，不同 App 的聊天会共用同一份画像、历史和关系数据。"
+            else
+                "这是群聊发言人身份。会按 App + 群名 + 发言人昵称保存，避免不同群里的同名成员被串联。",
             11.5f, sub).apply { setPadding(0, dp(5), 0, 0) })
     }
 
@@ -313,8 +321,9 @@ class KnowledgeActivity : AppCompatActivity() {
         if (c0.identities.isNotEmpty()) {
             c.addView(text(
                 "平台：" + c0.identities.joinToString("  ·  ") {
-                    "${identityLabel(it.app)}: ${it.title}"
-                }.take(120),
+                    val scope = if (it.scope.isBlank()) "" else " @ " + it.scope
+                    "${identityLabel(it.app)}: ${it.title}${scope}"
+                }.take(140),
                 12f, sub).apply { setPadding(0, dp(5), 0, 0) })
         } else if (c0.apps.isNotEmpty()) {
             c.addView(text("平台：" + c0.apps.joinToString("、") { appLabel(it) }, 12f, sub)
@@ -373,10 +382,11 @@ class KnowledgeActivity : AppCompatActivity() {
         if (pendingLinkTitle.isNotBlank()) {
             c.addView(actionButton("关联当前会话到这个联系人") {
                 val msg = store.linkCurrentIdentityToContact(
-                    c0.id, pendingLinkApp, pendingLinkTitle)
+                    c0.id, pendingLinkApp, pendingLinkTitle, pendingLinkScope)
                 toast(msg)
                 pendingLinkApp = ""
                 pendingLinkTitle = ""
+                pendingLinkScope = ""
                 render()
             })
         }
@@ -668,6 +678,7 @@ class KnowledgeActivity : AppCompatActivity() {
     companion object {
         const val EXTRA_LINK_APP = "link_app"
         const val EXTRA_LINK_TITLE = "link_title"
+        const val EXTRA_LINK_SCOPE = "link_scope"
     }
 
     // --------------------------------------------------------- relationship graph
