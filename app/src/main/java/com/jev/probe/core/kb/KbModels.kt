@@ -84,6 +84,8 @@ data class Contact(
     val boundaries: String = "",
 
     val notes: String = "",
+    /** Counts of the user's actual GalGame taps, keyed by ReplyStrategy.name lowercase. */
+    val strategySelections: Map<String, Int> = emptyMap(),
     /** Reserved for the (deferred) auto-summary; never written automatically here. */
     val autoSummary: String = "",
     val updatedAt: Long = System.currentTimeMillis()
@@ -118,16 +120,23 @@ data class LogEntry(val side: String, val text: String, val ts: Long, val app: S
  * party is, older history for them, and the knowledge notes that matched.
  */
 data class ChatContext(
+    /** Primary person for reply adaptation; in a group this prefers the current speaker. */
     val contact: Contact?,
     val history: List<LogEntry>,
     val notes: List<Note>,
     /** Human-readable direct edges involving this contact, already name-resolved. */
-    val relationshipGraph: List<String> = emptyList()
+    val relationshipGraph: List<String> = emptyList(),
+    /** The group conversation contact, if the current chat is a group. */
+    val groupContact: Contact? = null,
+    /** The currently speaking person matched inside that group, when known. */
+    val speakerContact: Contact? = null,
+    val speakerName: String? = null
 ) {
 
     /** True when there is nothing extra to inject (then no field is sent at all). */
     fun isEmpty(): Boolean =
-        history.isEmpty() && notes.isEmpty() && contact == null && relationshipGraph.isEmpty()
+        history.isEmpty() && notes.isEmpty() && contact == null && relationshipGraph.isEmpty() &&
+            groupContact == null && speakerContact == null
 
     /**
      * The `background` string injected into Jev's state and the reply prompt:
@@ -142,6 +151,16 @@ data class ChatContext(
      */
     fun background(defaultRelationship: String): String {
         val sb = StringBuilder()
+        if (groupContact != null) {
+            sb.append("当前会话类型：群聊").append('\n')
+            sb.append("群聊：").append(groupContact.name).append('\n')
+            speakerName?.takeIf { it.isNotBlank() }?.let {
+                sb.append("当前发言人：").append(it).append('\n')
+            }
+            speakerContact?.let { sp ->
+                sb.append("当前发言人已关联人物：").append(sp.name).append('\n')
+            }
+        }
         contact?.let { c ->
             sb.append("关系模型说明：以下分数和画像由用户手动维护，仅作回复背景，不代表对方真实心理。").append('\n')
             val rel = c.relationship.trim()
