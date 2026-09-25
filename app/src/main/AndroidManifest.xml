@@ -28,6 +28,10 @@
             android:exported="false" />
 
         <activity
+            android:name=".ApiUsageActivity"
+            android:exported="false" />
+
+        <activity
             android:name=".KnowledgeActivity"
             android:exported="false" />
 
