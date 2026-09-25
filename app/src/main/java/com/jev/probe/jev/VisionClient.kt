@@ -3,6 +3,7 @@ package com.jev.probe.jev
 import android.graphics.Bitmap
 import android.util.Base64
 import com.jev.probe.core.Prefs
+import com.jev.probe.core.usage.ApiUsageStore
 import java.io.ByteArrayOutputStream
 import org.json.JSONArray
 import org.json.JSONObject
@@ -13,8 +14,7 @@ import org.json.JSONObject
  * the screenshot pipeline (see docs/v1.3-plan.md "OCR 分层").
  *
  * Reads visionBaseUrl / visionKey / visionModel from [Prefs]. The base URL does
- * not inherit from the reply route (a DeepSeek-style host has no vision
- * endpoint); the key still falls back reply -> judge.
+ * not inherit from the reply route; the key still falls back reply -> judge.
  *
  * Wire format notes that cost real debugging time:
  * - JPEG, not PNG: a screenshot as PNG base64 is several times larger.
@@ -53,8 +53,13 @@ class VisionClient(private val prefs: Prefs) {
             .put("messages", messages)
             .put("temperature", 0.0)
         val resp = HttpJson.post(url, prefs.effectiveVisionKey(), body, Route.VISION, HttpJson.headersFor(url))
-        return resp.optJSONArray("choices")?.optJSONObject(0)
+        val contentText = resp.optJSONArray("choices")?.optJSONObject(0)
             ?.optJSONObject("message")?.optString("content") ?: ""
+        ApiUsageStore.record(
+            prefs.appContext, Route.VISION, prefs.visionBaseUrl, prefs.visionModel,
+            body.toString(), resp, contentText
+        )
+        return contentText
     }
 
     companion object {
@@ -65,8 +70,7 @@ class VisionClient(private val prefs: Prefs) {
             return Base64.encodeToString(out.toByteArray(), Base64.NO_WRAP)
         }
 
-        /** DeepSeek's official API has no vision model; `image_url` is rejected. */
-        fun supportsVision(baseUrl: String): Boolean =
-            !baseUrl.contains("api.deepseek.com", ignoreCase = true)
+        /** V4.1 Flash supports OpenAI-compatible image_url input. */
+        fun supportsVision(baseUrl: String): Boolean = true
     }
 }
