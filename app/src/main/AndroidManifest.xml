@@ -44,6 +44,16 @@
         </service>
 
         <service
+            android:name=".capture.WeChatNotificationListener"
+            android:label="Jev Ultimate 微信通知触发"
+            android:exported="true"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
+            <intent-filter>
+                <action android:name="android.service.notification.NotificationListenerService" />
+            </intent-filter>
+        </service>
+
+        <service
             android:name=".capture.KeepAliveService"
             android:exported="false"
             android:foregroundServiceType="specialUse">
