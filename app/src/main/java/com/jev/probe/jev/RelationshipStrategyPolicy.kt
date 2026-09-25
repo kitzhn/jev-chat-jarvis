@@ -1,5 +1,6 @@
 package com.jev.probe.jev
 
+import com.jev.probe.core.ConversationScene
 import com.jev.probe.core.RankedReply
 import com.jev.probe.core.ReplyStrategy
 import com.jev.probe.core.kb.Contact
@@ -14,20 +15,99 @@ import kotlin.math.max
  */
 object RelationshipStrategyPolicy {
 
-    fun rerank(ranked: List<RankedReply>, contact: Contact?): List<RankedReply> {
+    fun rerank(
+        ranked: List<RankedReply>,
+        contact: Contact?,
+        scene: ConversationScene = ConversationScene.UNKNOWN
+    ): List<RankedReply> {
         if (ranked.isEmpty()) return ranked
         val base = if (ranked.any { it.judgeProb > 0.0 }) ranked else
             ranked.map { it.copy(judgeProb = 1.0 / ranked.size, prob = 1.0 / ranked.size) }
 
+        data class Weighted(
+            val reply: RankedReply,
+            val relation: Double,
+            val habit: Double,
+            val sceneWeight: Double,
+            val raw: Double
+        )
+
         val weighted = base.map { r ->
-            val w = weight(r.strategy, contact)
-            val raw = max(r.judgeProb, 0.001) * w
-            Triple(r, w, raw)
+            val relation = weight(r.strategy, contact)
+            val habit = habitWeight(r.strategy, contact)
+            val sceneWeight = sceneWeight(r.strategy, scene)
+            val raw = max(r.judgeProb, 0.001) * relation * habit * sceneWeight
+            Weighted(r, relation, habit, sceneWeight, raw)
         }
-        val sum = weighted.sumOf { it.third }.takeIf { it > 0.0 } ?: 1.0
-        return weighted.map { (r, w, raw) ->
-            r.copy(prob = raw / sum, relationWeight = w)
+        val sum = weighted.sumOf { it.raw }.takeIf { it > 0.0 } ?: 1.0
+        return weighted.map { w ->
+            w.reply.copy(
+                prob = w.raw / sum,
+                relationWeight = w.relation,
+                habitWeight = w.habit,
+                sceneWeight = w.sceneWeight,
+                scene = scene
+            )
         }.sortedByDescending { it.prob }
+    }
+
+    fun habitWeight(strategy: ReplyStrategy, contact: Contact?): Double {
+        contact ?: return 1.0
+        val counts = contact.strategySelections
+        val total = counts.values.sum().coerceAtLeast(0)
+        if (total <= 0) return 1.0
+
+        val key = strategy.name.lowercase()
+        val count = counts[key] ?: 0
+        // Symmetric Dirichlet prior (2 taps each) keeps early samples gentle.
+        val posterior = (count + 2.0) / (total + 8.0)
+        val relative = posterior / 0.25
+        val confidence = total.toDouble() / (total + 12.0)
+        return (1.0 + confidence * (relative - 1.0) * 0.30).coerceIn(0.75, 1.30)
+    }
+
+    fun sceneWeight(strategy: ReplyStrategy, scene: ConversationScene): Double = when (scene) {
+        ConversationScene.CASUAL -> when (strategy) {
+            ReplyStrategy.PLAYFUL -> 1.15
+            ReplyStrategy.WARM -> 1.05
+            ReplyStrategy.PROACTIVE -> 1.02
+            ReplyStrategy.STEADY -> 0.95
+            else -> 1.0
+        }
+        ConversationScene.COMFORT -> when (strategy) {
+            ReplyStrategy.WARM -> 1.25
+            ReplyStrategy.STEADY -> 1.08
+            ReplyStrategy.PLAYFUL -> 0.75
+            ReplyStrategy.PROACTIVE -> 0.85
+            else -> 1.0
+        }
+        ConversationScene.CONFLICT -> when (strategy) {
+            ReplyStrategy.STEADY -> 1.25
+            ReplyStrategy.WARM -> 1.15
+            ReplyStrategy.PLAYFUL -> 0.70
+            ReplyStrategy.PROACTIVE -> 0.75
+            else -> 1.0
+        }
+        ConversationScene.WORK -> when (strategy) {
+            ReplyStrategy.STEADY -> 1.20
+            ReplyStrategy.PROACTIVE -> 1.10
+            ReplyStrategy.WARM -> 0.90
+            ReplyStrategy.PLAYFUL -> 0.85
+            else -> 1.0
+        }
+        ConversationScene.MEETUP -> when (strategy) {
+            ReplyStrategy.PROACTIVE -> 1.25
+            ReplyStrategy.PLAYFUL -> 1.05
+            else -> 1.0
+        }
+        ConversationScene.APOLOGY -> when (strategy) {
+            ReplyStrategy.WARM -> 1.20
+            ReplyStrategy.STEADY -> 1.15
+            ReplyStrategy.PROACTIVE -> 0.90
+            ReplyStrategy.PLAYFUL -> 0.65
+            else -> 1.0
+        }
+        ConversationScene.UNKNOWN -> 1.0
     }
 
     fun weight(strategy: ReplyStrategy, contact: Contact?): Double {
