@@ -95,6 +95,9 @@ class MainActivity : AppCompatActivity() {
         container.addView(actionRow("API 与设置", "快速方案 · 自定义接口 · 密钥 · 模型 · 隐私设置") {
             startActivity(Intent(this, SettingsActivity::class.java))
         })
+        container.addView(actionRow("API 消耗仪表盘", "今日 / 本月 token · 分模型费用 · 人民币估算") {
+            startActivity(Intent(this, ApiUsageActivity::class.java))
+        })
         container.addView(actionRow("联系人 · 画像 · 关系网", "跨 App 身份 · 好感时间线 · 联系人之间的关系") {
             startActivity(Intent(this, KnowledgeActivity::class.java))
         })
