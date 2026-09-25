@@ -5,6 +5,7 @@ import com.jev.probe.core.Prefs
 import com.jev.probe.core.ReplyDraft
 import com.jev.probe.core.ReplyStrategy
 import com.jev.probe.core.kb.ChatContext
+import com.jev.probe.core.usage.ApiUsageStore
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -93,8 +94,13 @@ class ReplyClient(private val prefs: Prefs) {
             .put("messages", messages)
             .put("temperature", temperature)
         val resp = HttpJson.post(url, prefs.effectiveReplyKey(), body, Route.REPLY, HttpJson.headersFor(url))
-        return resp.optJSONArray("choices")?.optJSONObject(0)
+        val content = resp.optJSONArray("choices")?.optJSONObject(0)
             ?.optJSONObject("message")?.optString("content") ?: ""
+        ApiUsageStore.record(
+            prefs.appContext, Route.REPLY, prefs.replyBaseUrl, prefs.replyModel,
+            body.toString(), resp, content
+        )
+        return content
     }
 
     private fun parseFour(content: String): List<String> {
