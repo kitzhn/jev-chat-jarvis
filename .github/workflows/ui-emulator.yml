@@ -1,5 +1,9 @@
 name: Capture Ultimate Emulator UI
 
+concurrency:
+  group: ui-emulator-${{ github.ref }}
+  cancel-in-progress: true
+
 on:
   push:
     branches:
