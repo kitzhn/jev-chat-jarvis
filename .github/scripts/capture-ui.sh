@@ -84,17 +84,33 @@ json.dump(contacts, open("demo/contacts.json","w"), ensure_ascii=False)
 json.dump(graph, open("demo/contact_relations.json","w"), ensure_ascii=False)
 json.dump(events, open("demo/relations/demo-a.json","w"), ensure_ascii=False)
 json.dump(logs, open("demo/logs/demo-a.json","w"), ensure_ascii=False)
+usage = [
+  {"ts":now-3600000,"route":"判断接口","baseUrl":"https://openrouter.ai/api","model":"typesafe/jev-1.13",
+   "inputTokens":12800,"outputTokens":0,"cachedInputTokens":0,"costCny":0.00361,"exactTokens":True,"pricingKnown":True},
+  {"ts":now-3000000,"route":"判断接口","baseUrl":"https://openrouter.ai/api","model":"typesafe/jev-1.13",
+   "inputTokens":8400,"outputTokens":0,"cachedInputTokens":0,"costCny":0.00237,"exactTokens":True,"pricingKnown":True},
+  {"ts":now-2400000,"route":"回复接口","baseUrl":"https://openrouter.ai/api/v1","model":"deepseek/deepseek-v4.1-flash",
+   "inputTokens":18500,"outputTokens":1450,"cachedInputTokens":3200,"costCny":0.0189,"exactTokens":True,"pricingKnown":True},
+  {"ts":now-1800000,"route":"回复接口","baseUrl":"https://api.deepseek.com/v1","model":"deepseek-flash",
+   "inputTokens":22000,"outputTokens":1800,"cachedInputTokens":9000,"costCny":0.0202,"exactTokens":True,"pricingKnown":True},
+  {"ts":now-1200000,"route":"视觉接口","baseUrl":"https://api.deepseek.com/v1","model":"deepseek-flash",
+   "inputTokens":9400,"outputTokens":320,"cachedInputTokens":0,"costCny":0.0120,"exactTokens":False,"pricingKnown":True}
+]
+os.makedirs("demo/usage", exist_ok=True)
+json.dump(usage, open("demo/usage/api_usage.json","w"), ensure_ascii=False)
 PY
 
-adb shell "run-as $PKG mkdir -p files/kb/logs files/kb/relations"
+adb shell "run-as $PKG mkdir -p files/kb/logs files/kb/relations files/usage"
 adb push demo/contacts.json /data/local/tmp/contacts.json >/dev/null
 adb push demo/contact_relations.json /data/local/tmp/contact_relations.json >/dev/null
 adb push demo/relations/demo-a.json /data/local/tmp/demo-a-relations.json >/dev/null
 adb push demo/logs/demo-a.json /data/local/tmp/demo-a-log.json >/dev/null
+adb push demo/usage/api_usage.json /data/local/tmp/api_usage.json >/dev/null
 adb shell "run-as $PKG cp /data/local/tmp/contacts.json files/kb/contacts.json"
 adb shell "run-as $PKG cp /data/local/tmp/contact_relations.json files/kb/contact_relations.json"
 adb shell "run-as $PKG cp /data/local/tmp/demo-a-relations.json files/kb/relations/demo-a.json"
 adb shell "run-as $PKG cp /data/local/tmp/demo-a-log.json files/kb/logs/demo-a.json"
+adb shell "run-as $PKG cp /data/local/tmp/api_usage.json files/usage/api_usage.json"
 
 cat > /tmp/ui_text.py <<'PY'
 import subprocess, xml.etree.ElementTree as ET, re, sys, time
@@ -220,3 +236,10 @@ python3 /tmp/ui_text.py wait "ALL CORE CHECKS PASS"
 adb exec-out screencap -p > screenshots/09-adaptive-core.png
 
 # Final v2.3 adaptive regression on current main.
+
+
+# API usage dashboard: real production activity reading local-only usage records.
+adb shell am start -W -n "$PKG/com.jev.probe.ApiUsageActivity" >/dev/null
+sleep 1
+python3 /tmp/ui_text.py wait "API 消耗仪表盘"
+adb exec-out screencap -p > screenshots/10-api-usage-dashboard.png
