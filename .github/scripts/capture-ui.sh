@@ -132,4 +132,17 @@ python3 /tmp/ui_text.py exact "联系人"
 adb exec-out screencap -p > screenshots/03-contacts.png
 
 python3 /tmp/ui_text.py exact "关系网"
+sleep 1
 adb exec-out screencap -p > screenshots/04-relationship-graph.png
+
+# Debug-only overlay demo: this exercises the real OverlayController with
+# GalGame-style option cards, then taps one option and verifies the chosen text
+# appears in the mock chat input box.
+adb shell appops set "$PKG" SYSTEM_ALERT_WINDOW allow
+adb shell am start -n "$PKG/com.jev.probe.OverlayDemoActivity" >/dev/null
+python3 /tmp/ui_text.py wait "DIALOGUE SELECT"
+adb exec-out screencap -p > screenshots/05-galgame-options.png
+
+python3 /tmp/ui_text.py exact "推荐选项"
+python3 /tmp/ui_text.py wait "可以呀，你定个时间，我们找个舒服的地方慢慢聊。"
+adb exec-out screencap -p > screenshots/06-galgame-filled.png
