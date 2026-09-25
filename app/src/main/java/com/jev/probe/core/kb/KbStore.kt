@@ -233,8 +233,15 @@ class KbStore private constructor(context: Context) {
         val identities = if (exists) contact.identities else
             contact.identities + PlatformIdentity(cleanApp, cleanTitle, label.trim(), cleanScope)
         val apps = if (cleanApp.isBlank() || cleanApp in contact.apps) contact.apps else contact.apps + cleanApp
-        val aliases = if ((listOf(contact.name) + contact.aliases).any { normalizeName(it) == normalizeName(cleanTitle) })
-            contact.aliases else contact.aliases + cleanTitle
+        val aliases = if (cleanScope.isNotBlank()) {
+            contact.aliases
+        } else if ((listOf(contact.name) + contact.aliases).any {
+                normalizeName(it) == normalizeName(cleanTitle)
+            }) {
+            contact.aliases
+        } else {
+            contact.aliases + cleanTitle
+        }
         saveContact(contact.copy(identities = identities, apps = apps, aliases = aliases))
     }
 
@@ -301,9 +308,9 @@ class KbStore private constructor(context: Context) {
             }
         }?.let { return@synchronized it }
 
-        loadContacts().firstOrNull { c ->
-            normalizeName(c.name) == wantSpeaker || c.aliases.any { normalizeName(it) == wantSpeaker }
-        }
+        // No global alias fallback here. A nickname learned inside one group
+        // must not silently identify a same-named member in another group.
+        null
     }
 
     private fun mergeContacts(targetId: String, sourceId: String): Boolean {
