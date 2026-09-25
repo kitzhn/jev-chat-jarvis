@@ -11,7 +11,7 @@ import com.jev.probe.core.kb.ChatContext
  * Construct with [Prefs] — every route reads its own address / key / model from
  * there, so switching providers in settings takes effect on the next call.
  */
-class JevClient(prefs: Prefs) {
+class JevClient(private val prefs: Prefs) {
 
     private val judgeClient = JudgeClient(prefs)
     private val replyClient = ReplyClient(prefs)
@@ -28,7 +28,9 @@ class JevClient(prefs: Prefs) {
     ): List<RankedReply> {
         val candidates = replyClient.draft(snapshot, relationship, ctx)
         val judged = judgeClient.rank(snapshot, relationship, candidates, ctx)
-        return RelationshipStrategyPolicy.rerank(judged, ctx?.contact)
+        return if (prefs.relationshipStrategyWeighting)
+            RelationshipStrategyPolicy.rerank(judged, ctx?.contact)
+        else judged
     }
 
 
