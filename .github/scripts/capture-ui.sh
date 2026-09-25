@@ -218,3 +218,5 @@ adb shell am start -W -n "$PKG/com.jev.probe.AdaptiveModelDemoActivity" >/dev/nu
 sleep 1
 python3 /tmp/ui_text.py wait "ALL CORE CHECKS PASS"
 adb exec-out screencap -p > screenshots/09-adaptive-core.png
+
+# Final v2.3 adaptive regression on current main.
