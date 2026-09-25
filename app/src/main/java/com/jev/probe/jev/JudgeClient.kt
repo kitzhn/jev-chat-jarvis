@@ -116,7 +116,7 @@ class JudgeClient(private val prefs: Prefs) {
     }
 
     private fun parseRanked(o: JSONObject?, candidates: List<String>): List<RankedReply> {
-        val keys = listOf("reply_a", "reply_b", "reply_c")
+        val keys = listOf("reply_a", "reply_b", "reply_c", "reply_d")
         val probs = o?.optJSONObject("probabilities")
         val list = candidates.mapIndexed { i, text ->
             RankedReply(text, probs?.optDouble(keys.getOrElse(i) { "" }, 0.0) ?: 0.0)
