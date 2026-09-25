@@ -414,6 +414,9 @@ mark_stage "13-wechat-notification-ocr"
 # OCR. Message nodes are not consumed by an adapter in this path.
 adb shell am start -W -n "$PKG/com.jev.probe.IntegrationSetupActivity" --ez allowFixtureChats true >/dev/null
 adb logcat -c
+# The same fixture was opened during the deny test. Restart it so onCreate
+# posts a fresh notification after consent is enabled.
+adb shell am force-stop com.tencent.mm
 adb shell am start -W -n "com.tencent.mm/com.jev.fixture.FixtureActivity" >/dev/null
 sleep 6
 adb logcat -d -v brief -s JEVASSIST:I > integration-results/wechat-ocr.txt
