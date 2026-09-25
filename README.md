@@ -18,10 +18,13 @@
 
 > ## Jev Ultimate（本 Fork）
 >
-> 本 Fork 当前为 **Jev Ultimate 2.3**：在上游基础上增加了 **跨 App / 群聊人物身份、联系人画像、好感/信任/亲密模型、科幻关系节点图、GalGame 四策略回复、画像 + 用户选择习惯 + 对话场景自适应排序、微信实验通知触发 OCR、显式重复联系人合并、API 快速方案以及无密钥配置导入/导出**。
+> 本 Fork 当前为 **Jev Ultimate 2.4**：在上游基础上增加了 **跨 App / 群聊人物身份、联系人画像、好感/信任/亲密模型、科幻关系节点图、GalGame 四策略回复、画像 + 用户选择习惯 + 对话场景自适应排序、微信实验通知触发 OCR、显式重复联系人合并、API 消耗仪表盘、API 快速方案以及无密钥配置导入/导出**。
+>
+> **我的下载入口：** [Debug 测试版构建](https://github.com/kitzhn/jev-chat-jarvis/actions/workflows/build-debug.yml) · [签名 Release 正式版构建](https://github.com/kitzhn/jev-chat-jarvis/actions/workflows/build-release.yml)  
+> 打开最新成功的运行记录，在 **Artifacts** 下载 `jev-ultimate-debug` 或 `jev-ultimate-release`。Debug 版只用于自己测试；长期分发给朋友请使用固定签名的 Release。
 >
 > 给朋友使用请先看：[**Jev Ultimate 中文使用说明书**](docs/USER_GUIDE_ZH.md)  
-> OpenRouter 无密钥配置示例：[docs/api-config-openrouter.example.json](docs/api-config-openrouter.example.json)
+> OpenRouter 无密钥配置示例：[docs/api-config-openrouter.example.json](docs/api-config-openrouter.example.json) · [代码审阅记录](docs/CODE_REVIEW_2026-09-25.md)
 >
 > Ultimate Debug 版使用独立包名后缀，可与官方版并存。仓库不包含任何个人联系人数据或 API Key。
 
@@ -234,8 +237,11 @@ QQ、X 全程只有一个 Activity，判「是不是聊天窗」要看树里有�
 JDK 17 + Android SDK（platform 35 / build-tools 35）。
 
 ```bash
-./gradlew assembleDebug      # app/build/outputs/apk/debug/app-debug.apk
-./gradlew assembleRelease    # 需要仓库外的签名 properties，路径由 JEV_KEYSTORE_PROPS 指定
+./gradlew :app:assembleDebug      # app/build/outputs/apk/debug/app-debug.apk
+./gradlew :app:assembleRelease    # 需要仓库外的签名 properties，路径由 JEV_KEYSTORE_PROPS 指定
+
+# 仅 CI / 集成回归需要 QQ、微信夹具：
+JEV_INTEGRATION_FIXTURES=1 ./gradlew :app:assembleDebug :integration-fixture:assembleQqDebug :integration-fixture:assembleWechatDebug
 ```
 
 - `app/` — Android 应用（Kotlin，传统 View）
@@ -247,6 +253,14 @@ JDK 17 + Android SDK（platform 35 / build-tools 35）。
 - `apk/` — 签好名的 release 包
 
 </details>
+
+### Ultimate 2.4：API 费用与 DeepSeek thinking
+
+- API 用量明细仍最多保留 5000 条，但被淘汰的明细会合并到按日汇总，因此高频使用时不会因为明细上限而漏掉本月前半段的请求与费用。
+- 视觉接口如果服务商没有返回图片 prompt token，会明确显示“图片 token 未知”，不再用 Base64 字符串长度估算图片计费。
+- API 用量文件保存的 Base URL 会去掉 URL 用户信息、query 和 fragment，避免自定义 URL 中的凭据被写进统计文件。
+- DeepSeek 官方 `deepseek-flash` 的回复与视觉/OCR默认显式关闭 thinking；设置页提供高级开关。开启 thinking 后不会发送 `temperature`，避免制造参数仍生效的错觉。
+- 费用仍属于本地估算，最终以 API 服务商账单为准。
 
 ## 已知限制
 
