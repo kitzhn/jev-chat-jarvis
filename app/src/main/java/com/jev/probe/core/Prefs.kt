@@ -131,7 +131,7 @@ class Prefs(context: Context, prefsName: String = PREFS_MAIN) {
         get() = sp.getString(K_REPLY_KEY, "") ?: ""
         set(v) = sp.edit().putString(K_REPLY_KEY, v.trim()).apply()
 
-    /** Generative model for drafting the 3 candidate replies. */
+    /** Generative model for drafting the 4 GalGame candidate replies. */
     var replyModel: String
         get() = sp.getString(K_REPLY_MODEL, DEFAULT_REPLY_MODEL) ?: DEFAULT_REPLY_MODEL
         set(v) = sp.edit().putString(K_REPLY_MODEL, v.trim()).apply()
@@ -140,8 +140,8 @@ class Prefs(context: Context, prefsName: String = PREFS_MAIN) {
 
     /**
      * Blank = the OpenRouter vision default. Deliberately does NOT follow
-     * [replyBaseUrl]: a reply host like DeepSeek has no vision endpoint, so
-     * inheriting it would silently break OCR.
+     * [replyBaseUrl]: reply and vision providers are independently configurable,
+     * even though DeepSeek V4.1 Flash now supports both text and images.
      */
     var visionBaseUrl: String
         get() = sp.getString(K_VISION_BASE, DEFAULT_VISION_BASE) ?: DEFAULT_VISION_BASE
