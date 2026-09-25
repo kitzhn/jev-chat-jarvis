@@ -288,8 +288,8 @@ open class ChatCaptureService : AccessibilityService() {
         // whatever was shown before must not leak into it.
         main.post { overlay?.resetForNewConversation() }
         lastSignature = sig
-        Log.d(TAG, "snapshot[$pkg] title=${snapshot.title} n=${snapshot.messages.size} " +
-            snapshot.messages.takeLast(6).joinToString(" | ") { "${it.side}:${it.text.length}" }) // sides + lengths only, never content
+        Log.d(TAG, "snapshot[$pkg] titlePresent=${!snapshot.title.isNullOrBlank()} n=${snapshot.messages.size} " +
+            snapshot.messages.takeLast(6).joinToString(" | ") { "${it.side}:${it.text.length}" }) // metadata only, never title/content
 
         // Trigger only when the newest message is from the other person, and only
         // if auto-analyze is on. Otherwise show the idle bubble (tap to analyze).
