@@ -41,7 +41,9 @@ data class ChatSnapshot(
 
     /** A stable signature of the last few messages, to detect real changes. */
     fun signature(): String =
-        messages.takeLast(6).joinToString("|") { "${it.side}:${it.text}" }
+        messages.takeLast(6).joinToString("|") {
+            "${it.side}:${it.speaker ?: ""}:${it.text}"
+        }
 }
 
 /** Jev's judgment result for one snapshot, plus the ranked candidate replies. */
