@@ -9,6 +9,7 @@ import com.jev.probe.core.RankedReply
 import com.jev.probe.core.ReplyDraft
 import com.jev.probe.core.Score
 import com.jev.probe.core.kb.ChatContext
+import com.jev.probe.core.usage.ApiUsageStore
 import org.json.JSONObject
 
 /**
@@ -97,7 +98,12 @@ class JudgeClient(private val prefs: Prefs) {
             .put("state", state)
             .put("questions", questions)
         val resp = HttpJson.post(url, prefs.judgeKey, body, Route.JUDGE, HttpJson.headersFor(url))
-        return resp.optJSONObject("answers") ?: JSONObject()
+        val answers = resp.optJSONObject("answers") ?: JSONObject()
+        ApiUsageStore.record(
+            prefs.appContext, Route.JUDGE, prefs.judgeBaseUrl, prefs.judgeModel,
+            body.toString(), resp, answers.toString()
+        )
+        return answers
     }
 
     private fun parseChoice(o: JSONObject?): Choice? {
