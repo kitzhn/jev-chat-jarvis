@@ -113,18 +113,19 @@ class ReplyClient(private val prefs: Prefs) {
             try {
                 val arr = JSONArray(content.substring(start, end + 1))
                 val out = ArrayList<String>()
-                for (i in 0 until arr.length()) out.add(arr.getString(i).trim())
+                for (i in 0 until arr.length()) {
+                    val value = arr.optString(i).trim()
+                    if (value.isNotBlank()) out.add(value)
+                }
                 if (out.size >= 4) return out.take(4)
-                while (out.size < 4) out.add("（稍等，我看下）")
-                return out
             } catch (_: Exception) { }
         }
-        // Fallback: split lines.
+        // Fallback: split plain-text lines, but never invent duplicate filler
+        // replies. Fewer than four valid candidates is a generation failure.
         val lines = content.split("\n").map {
             it.trim().trimStart('-', '*', '1', '2', '3', '4', '.', ' ', '"')
         }.filter { it.isNotBlank() }
-        val out = lines.take(4).toMutableList()
-        while (out.size < 4) out.add("（稍等，我看下）")
-        return out
+        if (lines.size >= 4) return lines.take(4)
+        throw IllegalArgumentException("回复模型没有返回 4 条可用候选，请重试")
     }
 }
