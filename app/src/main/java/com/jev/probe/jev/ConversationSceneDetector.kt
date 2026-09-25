@@ -36,9 +36,15 @@ object ConversationSceneDetector {
             ))
         )
 
-        val best = scores.entries.maxByOrNull { entry -> entry.value }
-            ?: return ConversationScene.UNKNOWN
-        return if (best.value <= 0) ConversationScene.CASUAL else best.key
+        var bestScene = ConversationScene.UNKNOWN
+        var bestScore = Int.MIN_VALUE
+        for ((scene, value) in scores) {
+            if (value > bestScore) {
+                bestScene = scene
+                bestScore = value
+            }
+        }
+        return if (bestScore <= 0) ConversationScene.CASUAL else bestScene
     }
 
     private fun score(text: String, terms: List<String>): Int =
