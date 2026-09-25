@@ -47,6 +47,9 @@ object ConversationSceneDetector {
         return if (bestScore <= 0) ConversationScene.CASUAL else bestScene
     }
 
-    private fun score(text: String, terms: List<String>): Int =
-        terms.sumOf { term -> if (text.contains(term)) 1 else 0 }
+    private fun score(text: String, terms: List<String>): Int {
+        var n = 0
+        terms.forEach { term -> if (text.contains(term)) n++ }
+        return n
+    }
 }
