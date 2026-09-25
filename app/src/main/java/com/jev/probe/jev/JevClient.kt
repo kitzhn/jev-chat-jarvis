@@ -71,24 +71,31 @@ class JevClient(prefs: Prefs) {
         fun hasAny(vararg terms: String) = terms.any { profile.contains(it.lowercase()) }
 
         val weight = when (strategy) {
-            ReplyStrategy.WARM ->
-                1.0 + 0.12 * affection + 0.10 * trust + 0.06 * closeness +
-                    if (hasAny("温柔", "体贴", "耐心", "倾听")) 0.10 else 0.0
+            ReplyStrategy.WARM -> {
+                val preference = if (hasAny("温柔", "体贴", "耐心", "倾听")) 0.10 else 0.0
+                1.0 + 0.12 * affection + 0.10 * trust + 0.06 * closeness + preference
+            }
 
-            ReplyStrategy.PLAYFUL ->
-                1.0 + 0.20 * closeness + 0.10 * affection +
-                    if (hasAny("轻松", "开玩笑", "幽默", "调侃", "自然")) 0.12 else 0.0 -
+            ReplyStrategy.PLAYFUL -> {
+                val preference = if (hasAny("轻松", "开玩笑", "幽默", "调侃", "自然")) 0.12 else 0.0
+                val boundaryPenalty =
                     if (hasAny("严肃", "不喜欢开玩笑", "别开玩笑", "不喜欢调侃", "正式")) 0.28 else 0.0
+                1.0 + 0.20 * closeness + 0.10 * affection + preference - boundaryPenalty
+            }
 
-            ReplyStrategy.STEADY ->
-                1.0 - 0.08 * closeness - 0.04 * affection +
-                    if (contact.boundaries.isNotBlank()) 0.10 else 0.0 +
+            ReplyStrategy.STEADY -> {
+                val boundaryBonus = if (contact.boundaries.isNotBlank()) 0.10 else 0.0
+                val preference =
                     if (hasAny("克制", "简洁", "明确", "先说结论", "冷静", "疏远", "冷却")) 0.14 else 0.0
+                1.0 - 0.08 * closeness - 0.04 * affection + boundaryBonus + preference
+            }
 
-            ReplyStrategy.PROACTIVE ->
-                1.0 + 0.18 * trust + 0.18 * closeness + 0.06 * affection +
-                    if (hasAny("主动", "直接", "推进", "明确安排")) 0.10 else 0.0 -
+            ReplyStrategy.PROACTIVE -> {
+                val preference = if (hasAny("主动", "直接", "推进", "明确安排")) 0.10 else 0.0
+                val boundaryPenalty =
                     if (hasAny("不要催", "不喜欢被催", "连续追问", "需要空间", "压力", "别追问", "疏远", "冷却")) 0.32 else 0.0
+                1.0 + 0.18 * trust + 0.18 * closeness + 0.06 * affection + preference - boundaryPenalty
+            }
 
             ReplyStrategy.UNKNOWN -> 1.0
         }
