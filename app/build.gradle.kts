@@ -23,6 +23,10 @@ android {
 
     defaultConfig {
         applicationId = "io.github.kitzhn.jevultimate"
+        // Ordinary downloadable Debug builds keep CI control components private.
+        // The emulator workflow alone exports them by setting the same fixture env.
+        manifestPlaceholders["integrationControlsExported"] =
+            if (System.getenv("JEV_INTEGRATION_FIXTURES") == "1") "true" else "false"
         minSdk = 30
         targetSdk = 35
         versionCode = 24
