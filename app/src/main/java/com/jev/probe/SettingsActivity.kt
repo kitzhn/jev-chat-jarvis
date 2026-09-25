@@ -357,6 +357,14 @@ class SettingsActivity : AppCompatActivity() {
         card2.addView(wlEdit)
         val autoRow = toggleRow("对方发消息时自动分析", prefs.autoAnalyze)
         card2.addView(autoRow)
+        val relationshipWeightRow = toggleRow(
+            "联系人画像参与候选策略排序",
+            prefs.relationshipStrategyWeighting
+        )
+        card2.addView(relationshipWeightRow)
+        card2.addView(text(
+            "开启后，好感/信任/亲密、沟通偏好和边界只作为本地排序先验，与 Jev 的当前对话判断合并；关闭后完全按 Jev 排名。",
+            11f, sub))
 
         // --- OCR 兜底（B 阶段）---
         val ocrFallbackRow = toggleRow("树读不到正文时用 OCR 兜底", prefs.ocrFallback)
@@ -479,6 +487,7 @@ class SettingsActivity : AppCompatActivity() {
             prefs.whitelist = wlEdit.text.toString().split("\n")
                 .map { it.trim() }.filter { it.isNotEmpty() }.toSet()
             prefs.autoAnalyze = (autoRow.tag as? Boolean) ?: true
+            prefs.relationshipStrategyWeighting = (relationshipWeightRow.tag as? Boolean) ?: true
             prefs.ocrFallback = (ocrFallbackRow.tag as? Boolean) ?: true
             prefs.ocrAutoAnalyze = (ocrAutoRow.tag as? Boolean) ?: false
             prefs.wechatAutoOcr = (wechatAutoRow.tag as? Boolean) ?: false
