@@ -40,7 +40,7 @@ class V23FeatureDemoActivity : AppCompatActivity() {
         val member = Contact(
             id = "v23-demo-member",
             name = "演示成员 B",
-            identities = listOf(PlatformIdentity(app, "演示成员 B", "QQ")),
+            identities = listOf(PlatformIdentity(app, "演示成员 B", "QQ", "演示旅行群 (5)")),
             relationship = "朋友",
             relationshipStage = "亲近",
             affection = 82,
