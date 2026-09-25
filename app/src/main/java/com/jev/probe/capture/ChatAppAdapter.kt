@@ -382,6 +382,7 @@ class FeishuAdapter : ChatAppAdapter {
             id.endsWith(":id/date_tv") ||
             id.endsWith(":id/system_label") ||
             id.endsWith(":id/kb_rich_text_content") ||
+            id.endsWith(":id/time_read_state_container_align_bubble") ||
             id.endsWith(":id/thread_title_tv") ||
             id.endsWith(":id/thread_subtitle_tv")
 }
