@@ -23,6 +23,7 @@ import com.jev.probe.core.Analysis
 import com.jev.probe.core.ChatSnapshot
 import com.jev.probe.core.Prefs
 import com.jev.probe.core.RankedReply
+import com.jev.probe.core.ReplyStrategy
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
@@ -447,6 +448,8 @@ class OverlayController(private val ctx: Context) {
                     index = i,
                     text = r.text,
                     pct = (r.prob * 100).roundToInt(),
+                    strategy = r.strategy,
+                    relationWeight = r.relationWeight,
                     onFill = fill
                 ))
             }
@@ -514,10 +517,18 @@ class OverlayController(private val ctx: Context) {
         index: Int,
         text: String,
         pct: Int,
+        strategy: ReplyStrategy,
+        relationWeight: Double,
         onFill: (String) -> Unit
     ): View {
         val labels = listOf("A", "B", "C", "D")
-        val styles = listOf("温柔承接", "轻松自然", "稳妥克制", "主动推进")
+        val style = when (strategy) {
+            ReplyStrategy.WARM -> "温柔承接"
+            ReplyStrategy.PLAYFUL -> "轻松自然"
+            ReplyStrategy.STEADY -> "稳妥克制"
+            ReplyStrategy.PROACTIVE -> "主动推进"
+            ReplyStrategy.UNKNOWN -> "对话选项"
+        }
         val accent = when (index) {
             0 -> Color.parseColor("#3A7AFE")
             1 -> Color.parseColor("#6D5DFB")
@@ -571,11 +582,19 @@ class OverlayController(private val ctx: Context) {
                 0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
         }
         middle.addView(TextView(ctx).apply {
-            this.text = styles.getOrElse(index) { "对话选项" } + if (index == 0) " · 推荐" else ""
+            this.text = style + if (index == 0) " · 推荐" else ""
             setTextColor(accent)
             textSize = 10.5f
             setTypeface(typeface, Typeface.BOLD)
         })
+        if (relationWeight != 1.0) {
+            middle.addView(TextView(ctx).apply {
+                val pctWeight = ((relationWeight - 1.0) * 100).roundToInt()
+                this.text = "关系加权 " + if (pctWeight >= 0) "+$pctWeight%" else "$pctWeight%"
+                setTextColor(Color.parseColor(if (pctWeight >= 0) "#16A34A" else "#D97706"))
+                textSize = 9.5f
+            })
+        }
         middle.addView(TextView(ctx).apply {
             this.text = text
             setTextColor(Color.parseColor("#111827"))
