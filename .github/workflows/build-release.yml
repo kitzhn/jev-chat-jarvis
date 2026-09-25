@@ -33,41 +33,51 @@ jobs:
           yes | "$SDKMANAGER" --licenses >/dev/null || true
           "$SDKMANAGER" "platform-tools" "platforms;android-35" "build-tools;35.0.0"
 
-      - name: Validate signing secrets
+      - name: Prepare release signing
         shell: bash
         env:
+          JEV_RELEASE_BUNDLE_B64: ${{ secrets.JEV_RELEASE_BUNDLE_B64 }}
           JEV_KEYSTORE_B64: ${{ secrets.JEV_KEYSTORE_B64 }}
           JEV_STORE_PASSWORD: ${{ secrets.JEV_STORE_PASSWORD }}
           JEV_KEY_ALIAS: ${{ secrets.JEV_KEY_ALIAS }}
           JEV_KEY_PASSWORD: ${{ secrets.JEV_KEY_PASSWORD }}
         run: |
-          missing=0
-          for name in JEV_KEYSTORE_B64 JEV_STORE_PASSWORD JEV_KEY_ALIAS JEV_KEY_PASSWORD; do
-            if [ -z "${!name}" ]; then
-              echo "::error::Missing repository secret: $name"
-              missing=1
+          if [ -n "$JEV_RELEASE_BUNDLE_B64" ]; then
+            python3 - <<'PY'
+          import os, json, base64
+          bundle = json.loads(base64.b64decode(os.environ["JEV_RELEASE_BUNDLE_B64"]).decode())
+          required = ["keystoreB64","storePassword","keyAlias","keyPassword"]
+          missing = [k for k in required if not bundle.get(k)]
+          if missing:
+              raise SystemExit("Signing bundle missing: " + ", ".join(missing))
+          open(os.environ["RUNNER_TEMP"] + "/jev-ultimate.keystore","wb").write(base64.b64decode(bundle["keystoreB64"]))
+          with open(os.environ["RUNNER_TEMP"] + "/jev-release.properties","w",encoding="utf-8") as f:
+              f.write("storeFile=" + os.environ["RUNNER_TEMP"] + "/jev-ultimate.keystore\n")
+              f.write("storePassword=" + bundle["storePassword"] + "\n")
+              f.write("keyAlias=" + bundle["keyAlias"] + "\n")
+              f.write("keyPassword=" + bundle["keyPassword"] + "\n")
+          PY
+            echo "Using JEV_RELEASE_BUNDLE_B64"
+          else
+            missing=0
+            for name in JEV_KEYSTORE_B64 JEV_STORE_PASSWORD JEV_KEY_ALIAS JEV_KEY_PASSWORD; do
+              if [ -z "${!name}" ]; then
+                echo "::error::Missing repository secret: $name"
+                missing=1
+              fi
+            done
+            if [ "$missing" -ne 0 ]; then
+              echo "::error::Set JEV_RELEASE_BUNDLE_B64 (recommended) or the four legacy signing secrets."
+              exit 1
             fi
-          done
-          if [ "$missing" -ne 0 ]; then
-            echo "Configure the four Actions secrets once, then rerun this workflow."
-            exit 1
-          fi
-
-      - name: Prepare release keystore
-        shell: bash
-        env:
-          JEV_KEYSTORE_B64: ${{ secrets.JEV_KEYSTORE_B64 }}
-          JEV_STORE_PASSWORD: ${{ secrets.JEV_STORE_PASSWORD }}
-          JEV_KEY_ALIAS: ${{ secrets.JEV_KEY_ALIAS }}
-          JEV_KEY_PASSWORD: ${{ secrets.JEV_KEY_PASSWORD }}
-        run: |
-          echo "$JEV_KEYSTORE_B64" | base64 --decode > "$RUNNER_TEMP/jev-ultimate.keystore"
-          cat > "$RUNNER_TEMP/jev-release.properties" <<EOF
+            echo "$JEV_KEYSTORE_B64" | base64 --decode > "$RUNNER_TEMP/jev-ultimate.keystore"
+            cat > "$RUNNER_TEMP/jev-release.properties" <<EOF
           storeFile=$RUNNER_TEMP/jev-ultimate.keystore
           storePassword=$JEV_STORE_PASSWORD
           keyAlias=$JEV_KEY_ALIAS
           keyPassword=$JEV_KEY_PASSWORD
           EOF
+          fi
 
       - name: Make Gradle executable
         run: chmod +x ./gradlew
