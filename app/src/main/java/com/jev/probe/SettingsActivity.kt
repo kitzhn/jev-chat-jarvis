@@ -219,7 +219,7 @@ class SettingsActivity : AppCompatActivity() {
         replyCard.addView(label("Base URL"))
         replyCard.addView(replyBaseEdit)
         replyCard.addView(label("密钥"))
-        replyCard.addView(edit(prefs.replyKey, "留空则用判断接口密钥", password = true).also { replyKeyEdit = it })
+        replyCard.addView(edit(prefs.replyKey, "同一服务商可留空继承判断 Key；跨服务商必须单独填写", password = true).also { replyKeyEdit = it })
         replyCard.addView(label("模型"))
         replyCard.addView(replyModelEdit)
         val deepSeekThinkingRow = toggleRow(
@@ -241,7 +241,7 @@ class SettingsActivity : AppCompatActivity() {
                 replyModel = model.ifBlank { Prefs.DEFAULT_REPLY_MODEL }
                 deepSeekThinkingEnabled = (deepSeekThinkingRow.tag as? Boolean) ?: false
             }
-            if (probe.effectiveReplyKey().isBlank()) { replyResult.text = "请先填密钥（或填判断接口密钥）"; return@cardBtn }
+            if (probe.effectiveReplyKey().isBlank()) { replyResult.text = "请填写回复接口密钥；只有同一服务商才会继承判断 Key"; return@cardBtn }
             replyResult.text = "测试中…"
             worker.execute {
                 val t0 = System.currentTimeMillis()
@@ -283,7 +283,7 @@ class SettingsActivity : AppCompatActivity() {
         visionCard.addView(label("Base URL"))
         visionCard.addView(visionBaseEdit)
         visionCard.addView(label("密钥"))
-        visionCard.addView(edit(prefs.visionKey, "留空则用回复接口密钥", password = true).also { visionKeyEdit = it })
+        visionCard.addView(edit(prefs.visionKey, "同一服务商可留空继承；跨服务商必须单独填写", password = true).also { visionKeyEdit = it })
         visionCard.addView(label("模型"))
         visionCard.addView(visionModelEdit)
         val visionResult = resultText()
@@ -298,7 +298,7 @@ class SettingsActivity : AppCompatActivity() {
                 visionModel = visionModelEdit.text.toString().trim().ifBlank { Prefs.DEFAULT_VISION_MODEL }
                 deepSeekThinkingEnabled = (deepSeekThinkingRow.tag as? Boolean) ?: false
             }
-            if (probe.effectiveVisionKey().isBlank()) { visionResult.text = "请先填密钥（或填回复/判断接口密钥）"; return@cardBtn }
+            if (probe.effectiveVisionKey().isBlank()) { visionResult.text = "请填写视觉接口密钥；只有同一服务商才会继承已有 Key"; return@cardBtn }
             visionResult.text = "测试中…"
             worker.execute {
                 val t0 = System.currentTimeMillis()
