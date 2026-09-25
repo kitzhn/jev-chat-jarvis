@@ -355,12 +355,10 @@ open class ChatCaptureService : AccessibilityService() {
 
         val notificationTitle = signal.conversationTitle
             ?.takeIf { !isTransientTitle(it) }
-            ?.takeIf { KbStore.normalizeName(it) !in setOf("微信", "wechat") }
 
         // Notification mode is intentionally conservative: if we cannot prove
         // the notification belongs to the currently open chat, do not screenshot.
-        if (notificationTitle.isNullOrBlank() || currentTitle.isNullOrBlank()) return
-        if (KbStore.normalizeName(notificationTitle) != KbStore.normalizeName(currentTitle)) return
+        if (!WeChatNotificationGate.matches(notificationTitle, currentTitle)) return
 
         pendingWechatTitle = currentTitle
         lastGoodTitle[PKG_WECHAT] = currentTitle
