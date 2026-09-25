@@ -92,6 +92,7 @@ open class ChatCaptureService : AccessibilityService() {
      *  screenshot; they do not read message text from the WeChat node tree. */
     private var pendingWechatTitle: String? = null
     private var lastWechatAutoShotAt: Long = 0L
+    private var lastWechatFailureNoticeAt: Long = 0L
     private val wechatAutoOcr = Runnable { runWechatAutoOcr() }
 
     override fun onServiceConnected() {
@@ -449,7 +450,19 @@ open class ChatCaptureService : AccessibilityService() {
                     // Throttle/interval codes are transient timing, not
                     // something the user can act on — nagging would be constant.
                     val transient = res.code == ScreenCapture.CODE_THROTTLED || res.code == 3
-                    if (manual || !transient) overlay?.showError(res.humanMessage)
+                    if (pkg == PKG_WECHAT && !manual) {
+                        // Automatic WeChat mode must stay unobtrusive. Protected
+                        // windows / OEM refusals degrade to idle, with at most one
+                        // short notice per minute rather than an error panel.
+                        overlay?.showIdle(treeTitle)
+                        val now = SystemClock.elapsedRealtime()
+                        if (!transient && now - lastWechatFailureNoticeAt >= WECHAT_FAILURE_NOTICE_MS) {
+                            lastWechatFailureNoticeAt = now
+                            overlay?.toast("微信自动识别暂不可用：${res.humanMessage}")
+                        }
+                    } else if (manual || !transient) {
+                        overlay?.showError(res.humanMessage)
+                    }
                 }
                 is ScreenCapture.Result.Ok -> {
                     ocr.scaleX = res.scaleX; ocr.scaleY = res.scaleY
@@ -692,6 +705,7 @@ open class ChatCaptureService : AccessibilityService() {
         private const val PKG_WECHAT = "com.tencent.mm"
         private const val WECHAT_DEBOUNCE_MS = 900L
         private const val WECHAT_MIN_INTERVAL_MS = 4000L
+        private const val WECHAT_FAILURE_NOTICE_MS = 60_000L
 
         /** Whole-screen OCR keeps the middle: no action bar, no input area. */
         private const val TOP_CROP = 0.12f
