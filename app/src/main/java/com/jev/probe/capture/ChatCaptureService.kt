@@ -93,7 +93,7 @@ open class ChatCaptureService : AccessibilityService() {
     private var pendingWechatTitle: String? = null
     private var lastWechatAutoShotAt: Long = 0L
     private var lastWechatFailureNoticeAt: Long = 0L
-     private val wechatAutoOcr = Runnable { runWechatAutoOcr() }
+    private val wechatAutoOcr = Runnable { runWechatAutoOcr() }
 
     override fun onServiceConnected() {
         super.onServiceConnected()
@@ -772,6 +772,7 @@ open class ChatCaptureService : AccessibilityService() {
         overlay?.onLinkSpeaker = null
         overlay?.onOcrCapture = null
         WeChatNotificationBridge.setListener(null)
+        main.removeCallbacks(debounce)
         main.removeCallbacks(wechatAutoOcr)
         overlay?.hide()
         overlay = null
