@@ -47,7 +47,7 @@ object ContextBuilder {
         val speakerName = if (inferredGroup)
             snapshot.messages.lastOrNull { it.side == "other" && !it.speaker.isNullOrBlank() }?.speaker
         else null
-        val speakerContact = speakerName?.let { store.findContact(it, app) }
+        val speakerContact = speakerName?.let { store.findSpeakerContact(it, app, title) }
         val groupContact = if (inferredGroup) conversationContact else null
         val contact = speakerContact ?: conversationContact
 
