@@ -145,7 +145,9 @@ class ApiUsageActivity : AppCompatActivity() {
         left.addView(text(b.route, 12f, accent, true))
         left.addView(text(b.model.ifBlank { "未命名模型" }, 14f, ink, true))
         row.addView(left)
-        row.addView(text(formatMoney(b.costCny), 16f, ink, true))
+        val costLabel = if (b.unknownPriceRequests == b.requests && b.costCny == 0.0)
+            "价格未知" else formatMoney(b.costCny)
+        row.addView(text(costLabel, 16f, ink, true))
         addView(row)
         addView(text("${b.requests} 次 · 输入 ${formatTokens(b.inputTokens)} · 输出 ${formatTokens(b.outputTokens)}",
             11.5f, sub).apply { setPadding(0, dp(7), 0, 0) })
