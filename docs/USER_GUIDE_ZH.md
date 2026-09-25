@@ -126,7 +126,7 @@ Android 最低版本：Android 11（API 30）。
 
 1. 在回复接口填写 DeepSeek API Key。
 2. Base URL 应为 `https://api.deepseek.com/v1`。
-3. 模型默认 `deepseek-chat`。
+3. 模型默认 `deepseek-flash`。
 4. 点击“测试回复”。
 
 判断接口仍保持原来的 Jev 配置。
@@ -191,7 +191,7 @@ Base URL 应填写到 `/v1` 为止，例如：
   "judgeBaseUrl": "https://openrouter.ai/api",
   "judgeModel": "typesafe/jev-1.13",
   "replyBaseUrl": "https://openrouter.ai/api/v1",
-  "replyModel": "deepseek/deepseek-chat-v3.1",
+  "replyModel": "deepseek/deepseek-v4.1-flash",
   "visionBaseUrl": "https://openrouter.ai/api/v1",
   "visionModel": "qwen/qwen2.5-vl-72b-instruct"
 }
@@ -644,7 +644,7 @@ GitHub Actions 会自动构建 Debug APK。
 
 Ultimate Debug 版本名：
 
-`2.3.0-debug`
+`2.4.0-debug`
 
 
 ## 25. 固定签名与长期更新
@@ -700,3 +700,47 @@ Contact
 ```
 
 最终目标是让 AI 面对不同软件、不同昵称和不同历史时，仍然能够识别“这是同一个现实联系人”，并使用用户自己维护的背景信息提供更一致的回复辅助。
+
+
+## API 消耗仪表盘
+
+首页新增 **API 消耗仪表盘**。
+
+它会在本机统计 Jev Ultimate 发出的三类接口请求：
+
+- 判断接口（Jev）
+- 回复接口
+- 视觉接口
+
+仪表盘显示：
+
+- 今日请求次数与预计费用
+- 本月请求次数与预计费用
+- 输入 token
+- 输出 token
+- 缓存命中 token
+- 按接口 / 模型拆分的消耗
+- token 是否来自 API 真实 `usage`
+- 哪些请求只能估算 token
+- 哪些自定义模型暂时没有内置价格
+
+统计文件只记录时间、接口、模型、token 和估算费用，**不会记录聊天正文、Prompt 或 API Key**。
+
+### 计费方式
+
+如果模型响应里有标准 `usage.prompt_tokens` / `completion_tokens`，优先使用真实值。
+
+如果服务商没有返回 usage，则根据请求与响应文本长度做本地估算，并在仪表盘标记“token 估算”。
+
+费用为本地估算，最终扣费以服务商账单为准。
+
+### DeepSeek V4.1 Flash
+
+2.4 起：
+
+- DeepSeek 官方模型名使用 `deepseek-flash`
+- OpenRouter 默认回复模型使用 `deepseek/deepseek-v4.1-flash`
+
+老版本中保存的默认 `deepseek-chat` 或 `deepseek/deepseek-chat-v3.1` 会在升级后自动迁移；用户手动填写的自定义模型不会被覆盖。
+
+DeepSeek V4.1 Flash 也支持图片输入，因此视觉接口现在可以直接选择 **DeepSeek 官方**。
