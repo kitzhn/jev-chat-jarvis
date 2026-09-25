@@ -1,5 +1,9 @@
 name: Build Android Debug APK
 
+concurrency:
+  group: debug-build-${{ github.ref }}
+  cancel-in-progress: true
+
 on:
   workflow_dispatch:
   push:
