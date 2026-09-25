@@ -171,3 +171,17 @@ adb shell input tap 430 1320
 sleep 1
 python3 /tmp/ui_text.py wait "可以呀，你定个时间，我们找个舒服的地方慢慢聊。"
 adb exec-out screencap -p > screenshots/06-galgame-filled.png
+
+
+# Relationship-aware GalGame cards are already captured in 05/06. Now verify
+# the pure WeChat OCR geometry stage with deterministic OCR boxes.
+adb shell am start -W -n "$PKG/com.jev.probe.WeChatOcrDemoActivity" >/dev/null
+sleep 1
+python3 /tmp/ui_text.py wait "PASS · other → me → other"
+adb exec-out screencap -p > screenshots/07-wechat-ocr-geometry.png
+
+# Show the opt-in WeChat auto-OCR setting in the real SettingsActivity.
+adb shell am start -n "$PKG/com.jev.probe.SettingsActivity" >/dev/null
+sleep 1
+python3 /tmp/ui_text.py contains "微信实验模式"
+adb exec-out screencap -p > screenshots/08-wechat-auto-ocr-setting.png
