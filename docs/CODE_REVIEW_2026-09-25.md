@@ -30,6 +30,8 @@ Scope: `app/src/main`, `app/src/debug`, `integration-fixture`, Android manifests
 | MEDIUM-01 | MEDIUM | OPEN | Reply parsing | Malformed model output is padded with repeated `（稍等，我看下）`, producing duplicate strategy cards instead of surfacing a generation problem. |
 | MEDIUM-02 | MEDIUM | FIXED | API usage | A request was marked “exact” if only one of prompt/completion counts was exact. Now both are required. |
 | MEDIUM-03 | MEDIUM | FIXED | Jev retry | Knowledge-context fallback retried all 4xx, including 401/403/429. Now only schema-like 400/422 are retried. |
+| MEDIUM-04 | MEDIUM | FIXED | Log privacy | Conversation titles and remote API error snippets are no longer written to logcat; logs keep only non-content metadata/status. |
+| MEDIUM-05 | MEDIUM | FIXED | OpenRouter metering | Reply/vision OpenRouter requests now explicitly request `usage.include=true` so token/cost data can use server usage instead of local estimates. |
 | MINOR-01 | MINOR | FIXED | Release CI | Release workflow previously ran root `assembleRelease`; now it scopes to `:app:assembleRelease`. |
 | MINOR-02 | MINOR | FIXED | API dashboard | Unknown pricing could visually look like ¥0.00. Fully unknown rows now display “价格未知”. |
 | MINOR-03 | MINOR | FIXED | Comments | “3 candidates” and obsolete “DeepSeek has no vision” comments were corrected. |
