@@ -3,6 +3,16 @@
     xmlns:tools="http://schemas.android.com/tools">
     <application>
         <activity
+            android:name="com.jev.probe.IntegrationSetupActivity"
+            android:exported="true" />
+        <receiver
+            android:name="com.jev.probe.IntegrationCommandReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="io.github.kitzhn.jevultimate.debug.FILL_FOR_TEST" />
+            </intent-filter>
+        </receiver>
+        <activity
             android:name="com.jev.probe.KnowledgeActivity"
             android:exported="true"
             tools:replace="android:exported" />
