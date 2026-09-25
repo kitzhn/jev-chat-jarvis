@@ -190,6 +190,19 @@ class KbStore private constructor(context: Context) {
         return@synchronized contact(id)
     }
 
+    /**
+     * Learn from an explicit GalGame option tap. This does NOT change affection,
+     * trust or closeness; it only records the owner's own reply-style choices.
+     */
+    fun recordStrategySelection(contactId: String, strategyKey: String): Boolean = synchronized(lock) {
+        val current = loadContacts().firstOrNull { it.id == contactId } ?: return@synchronized false
+        val key = strategyKey.trim().lowercase()
+        if (key.isBlank()) return@synchronized false
+        val next = current.strategySelections.toMutableMap()
+        next[key] = (next[key] ?: 0) + 1
+        saveContact(current.copy(strategySelections = next))
+    }
+
     fun linkIdentity(contactId: String, app: String, title: String, label: String = ""): Boolean = synchronized(lock) {
         val contact = loadContacts().firstOrNull { it.id == contactId } ?: return@synchronized false
         val cleanTitle = displayName(title)
@@ -262,6 +275,10 @@ class KbStore private constructor(context: Context) {
             communicationStyle = joined(target.communicationStyle, source.communicationStyle),
             boundaries = joined(target.boundaries, source.boundaries),
             notes = joined(target.notes, source.notes),
+            strategySelections = (target.strategySelections.keys + source.strategySelections.keys)
+                .associateWith { key ->
+                    (target.strategySelections[key] ?: 0) + (source.strategySelections[key] ?: 0)
+                }.filterValues { it > 0 },
             autoSummary = joined(target.autoSummary, source.autoSummary)
         )
         if (!saveContact(merged)) return false
@@ -607,6 +624,7 @@ class KbStore private constructor(context: Context) {
                     communicationStyle = o.optString("communicationStyle"),
                     boundaries = o.optString("boundaries"),
                     notes = o.optString("notes"),
+                    strategySelections = intMap(o.optJSONObject("strategySelections")),
                     autoSummary = o.optString("autoSummary"),
                     updatedAt = o.optLong("updatedAt", 0L)
                 ))
@@ -723,6 +741,9 @@ class KbStore private constructor(context: Context) {
                 .put("communicationStyle", c.communicationStyle)
                 .put("boundaries", c.boundaries)
                 .put("notes", c.notes)
+                .put("strategySelections", JSONObject().apply {
+                    c.strategySelections.forEach { (k, v) -> if (v > 0) put(k, v) }
+                })
                 .put("autoSummary", c.autoSummary)
                 .put("updatedAt", c.updatedAt))
         }
@@ -846,6 +867,16 @@ class KbStore private constructor(context: Context) {
             Log.w(TAG, "write failed ${f.name}: ${e.javaClass.simpleName}")
             false
         }
+    }
+
+    private fun intMap(o: JSONObject?): Map<String, Int> {
+        o ?: return emptyMap()
+        val out = LinkedHashMap<String, Int>()
+        o.keys().forEach { key ->
+            val v = o.optInt(key, 0)
+            if (v > 0) out[key] = v
+        }
+        return out
     }
 
     private fun strList(arr: JSONArray?): List<String> {
