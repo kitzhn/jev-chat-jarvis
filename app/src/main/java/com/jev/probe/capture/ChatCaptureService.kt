@@ -151,6 +151,7 @@ open class ChatCaptureService : AccessibilityService() {
                     startActivity(Intent(this, KnowledgeActivity::class.java)
                         .putExtra(KnowledgeActivity.EXTRA_LINK_APP, pkg)
                         .putExtra(KnowledgeActivity.EXTRA_LINK_TITLE, speaker)
+                        .putExtra(KnowledgeActivity.EXTRA_LINK_SCOPE, snapshot.title.orEmpty())
                         .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
                 }.onFailure {
                     overlay?.toast("打开联系人列表失败：${it.javaClass.simpleName}")
