@@ -19,6 +19,7 @@ import com.jev.probe.core.RankedReply
 import com.jev.probe.core.ReplyStrategy
 import com.jev.probe.core.Score
 import com.jev.probe.core.kb.Contact
+import com.jev.probe.core.kb.KbStore
 import com.jev.probe.jev.ConversationSceneDetector
 import com.jev.probe.jev.RelationshipStrategyPolicy
 import com.jev.probe.overlay.OverlayController
@@ -100,7 +101,8 @@ class OverlayDemoActivity : AppCompatActivity() {
                     latencyMs = 420
                 )
             )
-            val demoContact = Contact(
+            val store = KbStore.get(this)
+            val demoContact = store.contact("demo-a") ?: Contact(
                 id = "policy-demo",
                 name = "演示联系人 A",
                 relationship = "朋友",
@@ -144,6 +146,9 @@ class OverlayDemoActivity : AppCompatActivity() {
                 RelationshipStrategyPolicy.rerank(equalJudgeScores, demoContact, scene),
                 null
             ) { chosen ->
+                if (demoContact.id == "demo-a") {
+                    store.recordStrategySelection(demoContact.id, chosen.strategy.name.lowercase())
+                }
                 input.setText(chosen.text)
                 input.setSelection(input.text.length)
             }
