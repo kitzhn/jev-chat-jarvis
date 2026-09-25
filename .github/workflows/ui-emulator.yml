@@ -35,6 +35,7 @@ jobs:
     timeout-minutes: 40
     env:
       JEV_ABI: x86_64
+      JEV_INTEGRATION_FIXTURES: "1"
 
     steps:
       - name: Checkout
