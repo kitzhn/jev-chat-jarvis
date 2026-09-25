@@ -223,7 +223,7 @@ Current Jev reply generation sends `temperature=0.85` expecting varied GalGame c
 
 ### MAJOR-10 — exported CI controls are unsafe in distributed Debug APKs — FIXED
 
-**Resolution (approved 2026-09-25):** the two CI command components use a manifest placeholder that defaults to `exported=false`; the Android emulator workflow sets `JEV_INTEGRATION_FIXTURES=1`, which makes them exportable only in that CI build. Ordinary downloadable Debug and Release builds do not expose these controls.
+**Resolution (approved 2026-09-25):** all debug integration/test components use a manifest placeholder that defaults to `exported=false`; the Android emulator workflow sets `JEV_INTEGRATION_FIXTURES=1`, which makes them exportable only in that CI build. The ordinary Debug workflow now inspects the built APK manifest and fails if any CI/test-only component is exported. Release never contains the debug manifest.
 
 **Files:**  
 - `app/src/debug/AndroidManifest.xml`
@@ -299,14 +299,14 @@ These are time-sensitive and should be rechecked when updating model presets or 
 
 No MAJOR item below should be implemented until explicitly approved. Checked items were explicitly approved by the owner on 2026-09-25 and implemented on the review branch:
 
-- [ ] MAJOR-01 — add analysis generation/session guard.
+- [x] MAJOR-01 — add analysis generation/session guard.
 - [x] MAJOR-02 — redesign usage storage to retain monthly aggregates.
 - [x] MAJOR-03 — change vision missing-usage accounting semantics.
 - [x] MAJOR-04 — conditionally include the integration fixture module.
-- [ ] MAJOR-05 — delete legacy disguised accessibility artifacts.
+- [x] MAJOR-05 — delete legacy disguised accessibility artifacts.
 - [x] MAJOR-06 — sanitize persisted API base URLs.
-- [ ] MAJOR-07 — make API key inheritance provider/host-aware.
-- [ ] MAJOR-08 — require HTTPS or explicit local-network opt-in for custom endpoints.
+- [x] MAJOR-07 — make API key inheritance provider/host-aware.
+- [x] MAJOR-08 — require HTTPS or explicit local-network opt-in for custom endpoints.
 - [x] MAJOR-09 — make DeepSeek thinking mode explicit/configurable for reply and vision calls.
-- [ ] MAJOR-10 — move exported CI controls out of the distributable Debug APK.
+- [x] MAJOR-10 — keep CI/test-only components non-exported in distributable Debug and verify the built manifest.
 
