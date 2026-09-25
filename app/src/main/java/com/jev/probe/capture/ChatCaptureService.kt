@@ -359,9 +359,10 @@ open class ChatCaptureService : AccessibilityService() {
         // Notification mode is intentionally conservative: if we cannot prove
         // the notification belongs to the currently open chat, do not screenshot.
         if (!WeChatNotificationGate.matches(notificationTitle, currentTitle)) return
+        val stableTitle = currentTitle ?: return
 
-        pendingWechatTitle = currentTitle
-        lastGoodTitle[PKG_WECHAT] = currentTitle
+        pendingWechatTitle = stableTitle
+        lastGoodTitle[PKG_WECHAT] = stableTitle
         lastWechatNotificationAt = SystemClock.elapsedRealtime()
         main.removeCallbacks(wechatAutoOcr)
         main.postDelayed(wechatAutoOcr, WECHAT_NOTIFICATION_SETTLE_MS)
