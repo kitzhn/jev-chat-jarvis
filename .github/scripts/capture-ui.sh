@@ -135,9 +135,8 @@ raise SystemExit(f"{mode} text not found: {target}")
 PY
 
 adb shell am force-stop "$PKG"
-adb shell monkey -p "$PKG" -c android.intent.category.LAUNCHER 1 >/dev/null
+adb shell am start -W -n "$PKG/com.jev.probe.MainActivity" >/dev/null
 sleep 2
-python3 /tmp/ui_text.py wait "Jev Ultimate"
 adb exec-out screencap -p > screenshots/01-home.png
 
 adb shell am start -n "$PKG/com.jev.probe.SettingsActivity" >/dev/null
