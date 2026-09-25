@@ -167,7 +167,7 @@ adb exec-out screencap -p > screenshots/05-galgame-options.png
 # The demo uses a fixed Pixel 6 profile and OverlayController's deterministic
 # top-left layout, so tap the center of option A directly. The result is then
 # verified through the ordinary EditText hierarchy after the overlay collapses.
-adb shell input tap 430 1030
+adb shell input tap 430 1320
 sleep 1
 python3 /tmp/ui_text.py wait "可以呀，你定个时间，我们找个舒服的地方慢慢聊。"
 adb exec-out screencap -p > screenshots/06-galgame-filled.png
