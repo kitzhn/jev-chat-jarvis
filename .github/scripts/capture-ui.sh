@@ -16,8 +16,9 @@ contacts = [
     "id":"demo-a","name":"演示联系人 A","aliases":["A同学"],
     "apps":["com.tencent.mobileqq","com.ss.android.lark"],
     "identities":[
-      {"app":"com.tencent.mobileqq","title":"A_QQ","label":"QQ"},
-      {"app":"com.ss.android.lark","title":"A_飞书","label":"飞书"}
+      {"app":"com.tencent.mobileqq","title":"A_QQ","label":"QQ","scope":""},
+      {"app":"com.ss.android.lark","title":"A_飞书","label":"飞书","scope":""},
+      {"app":"com.tencent.mobileqq","title":"A同学","label":"QQ群成员","scope":"演示旅行群"}
     ],
     "relationship":"朋友","relationshipStage":"亲近",
     "affection":76,"trust":82,"closeness":69,
@@ -26,7 +27,21 @@ contacts = [
     "communicationStyle":"适合自然、简洁、不过度正式的表达",
     "boundaries":"不喜欢连续追问",
     "notes":"这是模拟器演示数据，不对应任何真实人物。",
+    "strategySelections":{"playful":20,"warm":6,"steady":3,"proactive":1},
     "autoSummary":"","updatedAt":now
+  },
+  {
+    "id":"demo-group","name":"演示旅行群","aliases":[],
+    "apps":["com.tencent.mobileqq"],
+    "identities":[
+      {"app":"com.tencent.mobileqq","title":"演示旅行群","label":"QQ群","scope":""}
+    ],
+    "relationship":"群聊","relationshipStage":"活跃",
+    "affection":50,"trust":50,"closeness":50,
+    "profileTags":["群聊","旅行"],
+    "traits":"","communicationStyle":"","boundaries":"",
+    "notes":"纯模拟器群聊数据。","strategySelections":{},
+    "autoSummary":"","updatedAt":now-1000
   },
   {
     "id":"demo-b","name":"演示联系人 B","aliases":[],
@@ -171,6 +186,15 @@ sleep 1
 python3 /tmp/ui_text.py wait "好啊，那周末见～你想吃什么？"
 adb exec-out screencap -p > screenshots/06-galgame-filled.png
 
+adb shell "run-as $PKG cat files/kb/contacts.json" > /tmp/contacts-after-choice.json
+python3 - <<'PY'
+import json
+data=json.load(open("/tmp/contacts-after-choice.json"))
+a=next(x for x in data if x.get("id")=="demo-a")
+assert a.get("strategySelections",{}).get("playful")==21, a.get("strategySelections")
+print("strategy learning persisted:", a["strategySelections"])
+PY
+
 
 # Relationship-aware GalGame cards are already captured in 05/06. Now verify
 # the pure WeChat OCR geometry stage with deterministic OCR boxes.
@@ -191,3 +215,14 @@ adb shell am start -W -n "$PKG/com.jev.probe.V23FeatureDemoActivity" >/dev/null
 sleep 1
 python3 /tmp/ui_text.py wait "ALL PASS · notification → scene → person → learned ranking"
 adb exec-out screencap -p > screenshots/09-v23-integration-matrix.png
+
+
+# Grant notification-listener access to the real production service declaration,
+# then run a debug-only integration page that exercises the actual group context,
+# scene detector, learned strategy counts and notification matching gate.
+adb shell cmd notification allow_listener "$PKG/com.jev.probe.capture.WeChatNotificationListener" 0 || true
+sleep 1
+adb shell am start -W -n "$PKG/com.jev.probe.AdaptiveModelDemoActivity" >/dev/null
+sleep 1
+python3 /tmp/ui_text.py wait "ALL CORE CHECKS PASS"
+adb exec-out screencap -p > screenshots/09-adaptive-core.png
