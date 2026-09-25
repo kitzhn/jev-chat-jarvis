@@ -157,10 +157,17 @@ adb exec-out screencap -p > screenshots/04-relationship-graph.png
 # GalGame-style option cards, then taps one option and verifies the chosen text
 # appears in the mock chat input box.
 adb shell appops set "$PKG" SYSTEM_ALERT_WINDOW allow
-adb shell am start -n "$PKG/com.jev.probe.OverlayDemoActivity" >/dev/null
-python3 /tmp/ui_text.py wait "DIALOGUE SELECT"
+echo "Overlay permission:"
+adb shell appops get "$PKG" SYSTEM_ALERT_WINDOW || true
+adb shell am start -W -n "$PKG/com.jev.probe.OverlayDemoActivity"
+sleep 3
 adb exec-out screencap -p > screenshots/05-galgame-options.png
 
-python3 /tmp/ui_text.py exact "推荐选项"
+# TYPE_APPLICATION_OVERLAY is not consistently exposed by uiautomator on API 35.
+# The demo uses a fixed Pixel 6 profile and OverlayController's deterministic
+# top-left layout, so tap the center of option A directly. The result is then
+# verified through the ordinary EditText hierarchy after the overlay collapses.
+adb shell input tap 430 1030
+sleep 1
 python3 /tmp/ui_text.py wait "可以呀，你定个时间，我们找个舒服的地方慢慢聊。"
 adb exec-out screencap -p > screenshots/06-galgame-filled.png
