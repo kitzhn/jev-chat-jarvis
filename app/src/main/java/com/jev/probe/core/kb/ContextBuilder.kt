@@ -102,18 +102,20 @@ object ContextBuilder {
         prefs: Prefs
     ): List<LogEntry> {
         val now = System.currentTimeMillis()
-        store.appendLog(contact.id, snapshot.messages.map { LogEntry(it.side, it.text, now, app) })
+        store.appendLog(contact.id, snapshot.messages.map {
+            LogEntry(it.side, it.text, now, app, it.speaker)
+        })
         val n = prefs.contextHistoryCount.coerceIn(0, 100)
         if (n == 0) return emptyList()
         val onScreen = snapshot.messages
             .filter { it.text.length >= DEDUPE_MIN_LEN }
-            .map { it.side + " " + it.text }
+            .map { it.side + " " + (it.speaker ?: "") + " " + it.text }
             .toHashSet()
         // Filter the widest window FIRST, then take n. The other order lets the
         // messages currently on screen eat into the quota — ask for 30 lines of
         // history, get 30 minus however many are already visible.
         return store.recentLog(contact.id, KbStore.MAX_LOG)
-            .filter { (it.side + " " + it.text) !in onScreen }
+            .filter { (it.side + " " + (it.speaker ?: "") + " " + it.text) !in onScreen }
             .takeLast(n)
     }
 
