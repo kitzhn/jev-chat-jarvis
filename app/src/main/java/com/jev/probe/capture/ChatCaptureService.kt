@@ -326,9 +326,8 @@ open class ChatCaptureService : AccessibilityService() {
 
         val root = rootInActiveWindow
         pendingWechatTitle = root?.let {
-            findTitleInActionBar(
-                it, Int.MAX_VALUE, resources.displayMetrics.widthPixels,
-                resources, 0.15, 0.85
+            findWeChatTitle(
+                it, Int.MAX_VALUE, resources.displayMetrics.widthPixels, resources
             )
         }?.takeIf { !isTransientTitle(it) } ?: lastGoodTitle[PKG_WECHAT]
         pendingWechatTitle?.let { lastGoodTitle[PKG_WECHAT] = it }
@@ -344,15 +343,28 @@ open class ChatCaptureService : AccessibilityService() {
 
     private fun onWechatNotification(signal: WeChatNotificationBridge.Signal) {
         if (!prefs.enabled || !prefs.wechatAutoOcr || !prefs.wechatNotificationTrigger) return
-        val pkg = rootInActiveWindow?.packageName?.toString() ?: return
+        val root = rootInActiveWindow ?: return
+        val pkg = root.packageName?.toString() ?: return
         if (pkg != PKG_WECHAT) return
 
+        val currentTitle = findWeChatTitle(
+            root, Int.MAX_VALUE, resources.displayMetrics.widthPixels, resources
+        )?.takeIf { !isTransientTitle(it) }
+            ?: pendingWechatTitle
+            ?: lastGoodTitle[PKG_WECHAT]
+
+        val notificationTitle = signal.conversationTitle
+            ?.takeIf { !isTransientTitle(it) }
+            ?.takeIf { KbStore.normalizeName(it) !in setOf("微信", "wechat") }
+
+        // Notification mode is intentionally conservative: if we cannot prove
+        // the notification belongs to the currently open chat, do not screenshot.
+        if (notificationTitle.isNullOrBlank() || currentTitle.isNullOrBlank()) return
+        if (KbStore.normalizeName(notificationTitle) != KbStore.normalizeName(currentTitle)) return
+
+        pendingWechatTitle = currentTitle
+        lastGoodTitle[PKG_WECHAT] = currentTitle
         lastWechatNotificationAt = SystemClock.elapsedRealtime()
-        signal.conversationTitle?.takeIf { !isTransientTitle(it) }?.let { title ->
-            // Use the notification title only as a hint. If the active window
-            // already has a stable title, prefer that to avoid cross-chat shots.
-            if (pendingWechatTitle.isNullOrBlank()) pendingWechatTitle = title
-        }
         main.removeCallbacks(wechatAutoOcr)
         main.postDelayed(wechatAutoOcr, WECHAT_NOTIFICATION_SETTLE_MS)
     }
