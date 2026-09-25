@@ -19,16 +19,16 @@ Scope: `app/src/main`, `app/src/debug`, `integration-fixture`, Android manifests
 
 | ID | Level | Status | Area | Finding |
 |---|---|---|---|---|
-| MAJOR-01 | MAJOR | **APPROVAL REQUIRED** | Async analysis | Old network results can paint a newer conversation because there is no analysis generation/session token. |
+| MAJOR-01 | MAJOR | **FIXED 2026-09-25** | Async analysis | Async judgment/reply/context deliveries are generation-scoped; conversation/window changes invalidate older callbacks. |
 | MAJOR-02 | MAJOR | **FIXED 2026-09-25** | API usage | Detail remains capped at 5000; evicted rows now roll into daily aggregates so current-day/month totals are retained. |
 | MAJOR-03 | MAJOR | **FIXED 2026-09-25** | Vision accounting | Vision prompt tokens are now marked unknown when provider usage is missing; Base64 length is never treated as billed image tokens. |
 | MAJOR-04 | MAJOR | **FIXED 2026-09-25** | Test architecture | `integration-fixture` is excluded from normal sync and included only when CI sets `JEV_INTEGRATION_FIXTURES=1`. |
-| MAJOR-05 | MAJOR / DEAD-CODE | **APPROVAL REQUIRED** | Accessibility legacy | Legacy `SelectToSpeakService` and `config_disguised.xml` remain in source although production Manifest now uses normal `ChatCaptureService`. They should be deleted after approval. |
+| MAJOR-05 | MAJOR / DEAD-CODE | **FIXED 2026-09-25** | Accessibility legacy | Obsolete `SelectToSpeakService` and `config_disguised.xml` have been removed. |
 | MAJOR-06 | MAJOR | **FIXED 2026-09-25** | Usage privacy | Persisted base URLs now strip userinfo, query and fragment; legacy records are sanitized during the v2 usage-state migration. |
-| MAJOR-07 | MAJOR / SECURITY | **APPROVAL REQUIRED** | API key routing | Reply/vision keys inherit the judge key even when the target host is a different provider, which can send one provider's credential to another provider. |
-| MAJOR-08 | MAJOR / SECURITY | **APPROVAL REQUIRED** | Transport | Custom API URLs are not restricted to HTTPS; a user can configure an `http://` endpoint and send bearer credentials/content in plaintext. |
+| MAJOR-07 | MAJOR / SECURITY | **FIXED 2026-09-25** | API key routing | Key inheritance is normalized-host aware; cross-provider routes require an explicit key. |
+| MAJOR-08 | MAJOR / SECURITY | **FIXED 2026-09-25** | Transport | Remote API endpoints require HTTPS; plain HTTP is accepted only for loopback development. |
 | MAJOR-09 | MAJOR | **FIXED 2026-09-25** | DeepSeek behavior/cost | Official `deepseek-flash` reply/vision calls now send an explicit thinking mode; default is disabled with an advanced user toggle. |
-| MAJOR-10 | MAJOR / SECURITY | **APPROVAL REQUIRED** | Debug distribution | Debug integration receiver/activity are exported and therefore unsafe to ship as the APK given to friends. |
+| MAJOR-10 | MAJOR / SECURITY | **FIXED 2026-09-25** | Debug distribution | CI integration controls are non-exported in ordinary Debug builds and exported only when the CI fixture environment flag is set. |
 | MEDIUM-01 | MEDIUM | **FIXED** | Reply parsing | Incomplete/malformed candidate output now surfaces a retryable generation error instead of duplicate filler cards. |
 | MEDIUM-02 | MEDIUM | FIXED | API usage | A request was marked “exact” if only one of prompt/completion counts was exact. Now both are required. |
 | MEDIUM-03 | MEDIUM | FIXED | Jev retry | Knowledge-context fallback retried all 4xx, including 401/403/429. Now only schema-like 400/422 are retried. |
@@ -54,9 +54,11 @@ Scope: `app/src/main`, `app/src/debug`, `integration-fixture`, Android manifests
 
 ---
 
-## MAJOR findings — do not modify without owner approval
+## MAJOR findings — implementation record
 
-### MAJOR-01 — stale async result can cross conversation boundaries
+### MAJOR-01 — stale async result can cross conversation boundaries — FIXED
+
+**Resolution (approved 2026-09-25):** each analysis run captures a monotonically increasing generation token. Conversation/window/OCR snapshot changes invalidate the current generation and clear `analyzing`; every context, judgment and reply delivery verifies the token before touching the overlay. Judgment failure no longer prematurely opens an overlap window while reply work is still in flight.
 
 **Files:**  
 - `app/src/main/java/com/jev/probe/capture/ChatCaptureService.kt`
@@ -73,7 +75,7 @@ Risk sequence:
 
 **Recommended fix:** introduce monotonically increasing `analysisGeneration` / conversation signature token. Every async branch captures it and checks it again on main-thread delivery. Only the current generation may update overlay state or clear `analyzing`.
 
-**Approval required:** yes. This changes core concurrency behavior.
+**Approval:** granted 2026-09-25; implemented.
 
 ### MAJOR-02 — monthly usage can silently undercount — FIXED
 
@@ -119,7 +121,9 @@ The test module intentionally builds APKs whose package names are `com.tencent.m
 
 **Approval required:** yes. Build-structure change.
 
-### MAJOR-05 — legacy accessibility bypass artifacts remain as dead code
+### MAJOR-05 — legacy accessibility bypass artifacts remain as dead code — FIXED
+
+**Resolution (approved 2026-09-25):** both obsolete artifacts were deleted; production continues to use the normal `ChatCaptureService` and current notification/OCR path.
 
 **Files:**  
 - `app/src/main/java/com/google/android/accessibility/selecttospeak/SelectToSpeakService.kt`
@@ -129,7 +133,7 @@ The production Manifest now registers the normal `ChatCaptureService`, and WeCha
 
 **Recommended fix:** delete both legacy files after confirming no historical build variant references them.
 
-**Approval required:** yes, because this is security-sensitive cleanup and intentionally removes a prior compatibility mechanism.
+**Approval:** granted 2026-09-25; implemented.
 
 ### MAJOR-06 — raw custom base URL can persist embedded credentials — FIXED
 
@@ -152,7 +156,9 @@ would therefore persist the query string in `files/usage/api_usage.json`. The sa
 
 **Approval required:** yes. This changes persisted audit data and the privacy contract.
 
-### MAJOR-07 — cross-provider key fallback can disclose credentials
+### MAJOR-07 — cross-provider key fallback can disclose credentials — FIXED
+
+**Resolution (approved 2026-09-25):** reply/vision key inheritance now requires the source and destination endpoints to share the same normalized scheme/host/port. Cross-provider routing with a blank route key stops locally with a configuration error instead of forwarding another provider's bearer token.
 
 **Files:**  
 - `app/src/main/java/com/jev/probe/core/Prefs.kt`
@@ -177,9 +183,11 @@ The same class of issue exists for arbitrary custom hosts.
 
 **Recommended fix:** key inheritance must be host/provider-aware. Only inherit a key when the source and destination belong to the same normalized provider/host. Otherwise require an explicit route key and block the request with a clear configuration error.
 
-**Approval required:** yes. This changes API configuration/fallback semantics.
+**Approval:** granted 2026-09-25; implemented.
 
-### MAJOR-08 — custom non-HTTPS endpoint can transmit secrets and chat text in plaintext
+### MAJOR-08 — custom non-HTTPS endpoint can transmit secrets and chat text in plaintext — FIXED
+
+**Resolution (approved 2026-09-25):** `HttpJson` rejects non-HTTPS remote endpoints before opening a connection. `http://localhost`, `127.0.0.1` and loopback IPv6 remain available for local development only.
 
 **Files:**  
 - `app/src/main/java/com/jev/probe/jev/HttpJson.kt`
@@ -195,7 +203,7 @@ without transport encryption.
 
 **Recommended fix:** require HTTPS for non-local endpoints. Optionally allow `http://127.0.0.1`, `http://localhost`, or private LAN endpoints only behind an explicit advanced warning/opt-in.
 
-**Approval required:** yes. This changes which custom endpoints are accepted.
+**Approval:** granted 2026-09-25; implemented.
 
 ### MAJOR-09 — DeepSeek Flash defaults to high-effort thinking for simple reply/OCR calls — FIXED
 
@@ -213,7 +221,9 @@ Current Jev reply generation sends `temperature=0.85` expecting varied GalGame c
 
 **Approval required:** yes. This changes model behavior, cost and potentially reply quality.
 
-### MAJOR-10 — exported CI controls are unsafe in distributed Debug APKs
+### MAJOR-10 — exported CI controls are unsafe in distributed Debug APKs — FIXED
+
+**Resolution (approved 2026-09-25):** the two CI command components use a manifest placeholder that defaults to `exported=false`; the Android emulator workflow sets `JEV_INTEGRATION_FIXTURES=1`, which makes them exportable only in that CI build. Ordinary downloadable Debug and Release builds do not expose these controls.
 
 **Files:**  
 - `app/src/debug/AndroidManifest.xml`
@@ -224,7 +234,7 @@ The emulator needs externally launchable controls, so the Debug manifest exports
 
 **Recommended fix:** separate CI instrumentation from the user-facing Debug build. Preferred design is an `integrationTest` product flavor/build type (or a dedicated test APK) that alone contains/export these controls. The ordinary Debug APK and Release APK should not contain them.
 
-**Approval required:** yes. This changes build variants and CI artifact layout.
+**Approval:** granted 2026-09-25; implemented with CI-only manifest export gating.
 
 ---
 
