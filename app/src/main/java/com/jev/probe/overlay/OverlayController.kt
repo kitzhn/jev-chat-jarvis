@@ -448,7 +448,7 @@ class OverlayController(private val ctx: Context) {
         if (generating) {
             views.add(hint("正在生成对话分支…"))
         } else {
-            val fill = lastFill ?: {}
+            val fill = lastFill ?: { _: RankedReply -> }
             a.rankedReplies.take(4).forEachIndexed { i, r ->
                 views.add(dialogueOptionCard(
                     index = i,
