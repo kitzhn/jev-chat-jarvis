@@ -16,3 +16,5 @@ dependencyResolutionManagement {
 
 rootProject.name = "jev-android"
 include(":app")
+
+include(":integration-fixture")
