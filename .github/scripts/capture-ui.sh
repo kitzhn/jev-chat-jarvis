@@ -265,7 +265,7 @@ sleep 1
 python3 /tmp/ui_text.py wait "ALL CORE CHECKS PASS"
 adb exec-out screencap -p > screenshots/09-adaptive-core.png
 
-# Final v2.3 adaptive regression on current main.
+# Final v2.4 adaptive regression on current main.
 
 
 mark_stage "10-api-dashboard"
