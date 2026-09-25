@@ -4,5 +4,8 @@
         <activity
             android:name="com.jev.probe.OverlayDemoActivity"
             android:exported="true" />
+        <activity
+            android:name="com.jev.probe.WeChatOcrDemoActivity"
+            android:exported="true" />
     </application>
 </manifest>
