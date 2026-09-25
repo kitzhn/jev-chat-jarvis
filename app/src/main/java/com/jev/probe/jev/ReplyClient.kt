@@ -93,6 +93,9 @@ class ReplyClient(private val prefs: Prefs) {
             .put("model", prefs.replyModel)
             .put("messages", messages)
             .put("temperature", temperature)
+        if (url.contains("openrouter.ai", ignoreCase = true)) {
+            body.put("usage", JSONObject().put("include", true))
+        }
         val resp = HttpJson.post(url, prefs.effectiveReplyKey(), body, Route.REPLY, HttpJson.headersFor(url))
         val content = resp.optJSONArray("choices")?.optJSONObject(0)
             ?.optJSONObject("message")?.optString("content") ?: ""
