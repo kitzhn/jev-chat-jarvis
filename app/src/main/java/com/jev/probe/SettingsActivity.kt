@@ -377,8 +377,24 @@ class SettingsActivity : AppCompatActivity() {
         val wechatAutoRow = toggleRow("微信实验模式：新消息后自动 OCR", prefs.wechatAutoOcr)
         card2.addView(wechatAutoRow)
         card2.addView(text(
-            "默认关闭。开启后由无障碍事件触发，约 0.9 秒防抖、至少 4 秒一次截图；本地 OCR 按左右位置推断双方。若系统或微信拒绝截图会自动降级，不会自动发送消息。",
+            "默认关闭。截图与 OCR 在本机完成；若系统或微信拒绝截图会自动降级，不会自动发送消息。",
             11f, sub))
+
+        val wechatNotificationRow = toggleRow(
+            "微信优先用新消息通知触发 OCR",
+            prefs.wechatNotificationTrigger
+        )
+        card2.addView(wechatNotificationRow)
+        card2.addView(text(
+            "开启后普通界面刷新不再安排截图；只有收到微信通知且你此刻正在微信里时才触发一次 OCR，可明显减少无意义截图。需要单独授予通知读取权限。",
+            11f, sub))
+        card2.addView(cardBtn("打开通知读取权限") {
+            runCatching {
+                startActivity(android.content.Intent("android.settings.ACTION_NOTIFICATION_LISTENER_SETTINGS"))
+            }.onFailure {
+                startActivity(android.content.Intent("android.settings.NOTIFICATION_LISTENER_SETTINGS"))
+            }
+        })
 
         // --- 知识库 / 关联上下文（D 阶段） ---
         val ctxRow = toggleRow("记录聊天历史（只存本机，用于关联上下文）", prefs.contextEnabled)
@@ -491,6 +507,7 @@ class SettingsActivity : AppCompatActivity() {
             prefs.ocrFallback = (ocrFallbackRow.tag as? Boolean) ?: true
             prefs.ocrAutoAnalyze = (ocrAutoRow.tag as? Boolean) ?: false
             prefs.wechatAutoOcr = (wechatAutoRow.tag as? Boolean) ?: false
+            prefs.wechatNotificationTrigger = (wechatNotificationRow.tag as? Boolean) ?: false
             prefs.contextEnabled = (ctxRow.tag as? Boolean) ?: false
             prefs.contextHistoryCount =
                 ctxCountEdit.text.toString().trim().toIntOrNull()?.coerceIn(0, 100) ?: 30
