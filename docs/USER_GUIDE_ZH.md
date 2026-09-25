@@ -649,7 +649,7 @@ GitHub Actions 会自动构建 Debug APK。
 
 Ultimate Debug 版本名：
 
-`2.4.0-debug`
+`2.5.0-debug`
 
 
 ## 25. 固定签名与长期更新

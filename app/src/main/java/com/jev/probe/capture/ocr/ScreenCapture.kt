@@ -39,6 +39,8 @@ class ScreenCapture(
 ) {
 
     sealed class Result {
+        /** The chat changed or stopped matching the allowlist before the shot. */
+        object Canceled : Result()
         /**
          * [scaleX]/[scaleY] = bitmap size / captured area size, and
          * [originX]/[originY] = where that area starts on screen.
@@ -63,7 +65,11 @@ class ScreenCapture(
     private val main = Handler(Looper.getMainLooper())
 
     /** Take one screenshot. [onResult] runs on the main thread, exactly once. */
-    fun capture(onResult: (Result) -> Unit) {
+    fun capture(stillAllowed: () -> Boolean = { true }, onResult: (Result) -> Unit) {
+        if (!stillAllowed()) {
+            onResult(Result.Canceled)
+            return
+        }
         val now = SystemClock.elapsedRealtime()
         val need = requiredInterval()
         if (now - lastAttemptAt < need) {
@@ -76,18 +82,32 @@ class ScreenCapture(
         val finish: (Result) -> Unit = { r ->
             if (done.compareAndSet(false, true)) {
                 restoreOverlay()
-                if (r is Result.Ok) failStreak = 0
-                else failStreak = (failStreak + 1).coerceAtMost(MAX_STREAK)
+                when (r) {
+                    is Result.Ok -> failStreak = 0
+                    is Result.Failed -> failStreak = (failStreak + 1).coerceAtMost(MAX_STREAK)
+                    Result.Canceled -> Unit
+                }
                 onResult(r)
             }
         }
 
         // Hide the bubble, give the compositor a frame to drop it, then shoot.
         runCatching { hideOverlay() }
-        main.postDelayed({ shoot(finish, done) }, HIDE_SETTLE_MS)
+        main.postDelayed({
+            if (stillAllowed()) shoot(finish, done, stillAllowed)
+            else finish(Result.Canceled)
+        }, HIDE_SETTLE_MS)
     }
 
-    private fun shoot(finish: (Result) -> Unit, done: AtomicBoolean) {
+    private fun shoot(
+        finish: (Result) -> Unit,
+        done: AtomicBoolean,
+        stillAllowed: () -> Boolean
+    ) {
+        if (!stillAllowed()) {
+            finish(Result.Canceled)
+            return
+        }
         val exec = service.mainExecutor
         // Which area the picture will cover. Set just before the window shot is
         // issued and read inside the callback, so the mapping always matches the

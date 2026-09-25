@@ -25,6 +25,9 @@ on:
       - ".github/scripts/capture-ui.sh"
       - ".github/workflows/ui-emulator.yml"
 
+permissions:
+  contents: read
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -39,10 +42,12 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v5
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
 
       - name: Set up JDK 17
-        uses: actions/setup-java@v5
+        uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
         with:
           distribution: temurin
           java-version: "17"
@@ -57,10 +62,16 @@ jobs:
       - name: Build Jev and messenger fixtures
         run: |
           chmod +x ./gradlew
-          ./gradlew             :app:assembleDebug             :integration-fixture:assembleQqDebug             :integration-fixture:assembleWechatDebug             --stacktrace
+          ./gradlew \
+            :app:assembleDebug \
+            :integration-fixture:assembleQqDebug \
+            :integration-fixture:assembleWechatDebug \
+            :integration-fixture:assembleFeishuDebug \
+            :integration-fixture:assembleTwitterDebug \
+            --stacktrace
 
       - name: Run Android 15 integration regression
-        uses: reactivecircus/android-emulator-runner@v2
+        uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2
         with:
           api-level: 35
           arch: x86_64
@@ -72,7 +83,7 @@ jobs:
 
       - name: Upload emulator evidence
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: jev-ultimate-emulator-evidence
           path: |

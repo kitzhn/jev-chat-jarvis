@@ -4,4 +4,11 @@
     <item name="mjq" type="id" />
     <item name="input" type="id" />
     <item name="bkl" type="id" />
+    <item name="group_name" type="id" />
+    <item name="thread_title_tv" type="id" />
+    <item name="name_tv" type="id" />
+    <item name="message" type="id" />
+    <item name="bubble_content_container" type="id" />
+    <item name="kb_rich_text_content" type="id" />
+    <item name="time_read_state_container_align_bubble" type="id" />
 </resources>

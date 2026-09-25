@@ -29,8 +29,8 @@ android {
             if (System.getenv("JEV_INTEGRATION_FIXTURES") == "1") "true" else "false"
         minSdk = 30
         targetSdk = 35
-        versionCode = 24
-        versionName = "2.4.0"
+        versionCode = 25
+        versionName = "2.5.0"
 
         // ML Kit's bundled Chinese recognizer ships native libs for every ABI.
         // The target phone (and every phone this can run on: minSdk 30) is
@@ -98,4 +98,5 @@ dependencies {
     // On-device OCR. The *bundled* Chinese model (not the play-services variant):
     // it works on phones with no Google Play services and needs no model download.
     implementation("com.google.mlkit:text-recognition-chinese:16.0.1")
+    testImplementation("junit:junit:4.13.2")
 }

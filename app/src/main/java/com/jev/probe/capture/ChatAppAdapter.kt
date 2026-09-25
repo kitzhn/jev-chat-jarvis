@@ -26,7 +26,33 @@ import com.jev.probe.core.Msg
  */
 interface ChatAppAdapter {
     val pkg: String
+    /** Reads only a chat-title field/header so the allowlist can run before message extraction. */
+    fun extractTitle(root: AccessibilityNodeInfo, res: Resources): String?
     fun extract(root: AccessibilityNodeInfo, res: Resources): ChatSnapshot?
+}
+
+/** Read text only from nodes with known title ids; message nodes are never queried. */
+private fun findTextForIdSuffixes(
+    root: AccessibilityNodeInfo,
+    suffixesInPriorityOrder: List<String>
+): String? {
+    val candidates = HashMap<String, String>()
+    val stack = ArrayDeque<AccessibilityNodeInfo>()
+    stack.addLast(root)
+    var guard = 0
+    while (stack.isNotEmpty() && guard < 6000) {
+        guard++
+        val node = stack.removeLast()
+        val id = node.viewIdResourceName.orEmpty()
+        val suffix = suffixesInPriorityOrder.firstOrNull { id.endsWith(it) }
+        if (suffix != null && !candidates.containsKey(suffix)) {
+            node.text?.toString()?.trim()?.takeIf { it.isNotEmpty() }?.let {
+                candidates[suffix] = it
+            }
+        }
+        for (i in node.childCount - 1 downTo 0) node.getChild(i)?.let { stack.addLast(it) }
+    }
+    return suffixesInPriorityOrder.firstNotNullOfOrNull { candidates[it] }
 }
 
 /** Shared helpers. */
@@ -61,10 +87,10 @@ internal fun findTitleInActionBar(
     while (stack.isNotEmpty() && guard < 5000) {
         guard++
         val node = stack.removeLast()
-        val text = node.text?.toString()
-        if (!text.isNullOrBlank() && text.length <= 24 && !looksLikeTimestamp(text)) {
-            val b = Rect(); node.getBoundsInScreen(b)
-            if (b.bottom in 1 until actionBarMax && b.centerX() in minCenterX..maxCenterX) {
+        val b = Rect(); node.getBoundsInScreen(b)
+        if (b.bottom in 1 until actionBarMax && b.centerX() in minCenterX..maxCenterX) {
+            val text = node.text?.toString()
+            if (!text.isNullOrBlank() && text.length <= 24 && !looksLikeTimestamp(text)) {
                 if (b.top < bestTop) { bestTop = b.top; best = text }
             }
         }
@@ -91,8 +117,8 @@ internal fun isLikelyGroupTitle(title: String?): Boolean =
  * `我有企微，但是用不习惯`, a chat line). A candidate must not read like a
  * sentence (no Chinese punctuation) and must sit above the first bubble; among
  * what is left, a group title's trailing "(N)" member count wins when present.
- * Nothing qualifying → null (the caller's `lastGoodTitle` then carries the
- * previous stable title forward instead of guessing).
+ * Nothing qualifying → null; the caller fails closed instead of reusing a
+ * title from a previous screen.
  */
 internal fun findWeChatTitle(
     root: AccessibilityNodeInfo,
@@ -113,13 +139,13 @@ internal fun findWeChatTitle(
     while (stack.isNotEmpty() && guard < 5000) {
         guard++
         val node = stack.removeLast()
-        val text = node.text?.toString()
-        if (!text.isNullOrBlank() && text.length <= 24 && !looksLikeTimestamp(text) &&
-            !WECHAT_TITLE_EXCLUDE_PUNCT.containsMatchIn(text)
+        val b = Rect(); node.getBoundsInScreen(b)
+        if (b.bottom in 1 until actionBarMax && b.bottom < firstBubbleTop &&
+            b.centerX() in minCenterX..maxCenterX
         ) {
-            val b = Rect(); node.getBoundsInScreen(b)
-            if (b.bottom in 1 until actionBarMax && b.bottom < firstBubbleTop &&
-                b.centerX() in minCenterX..maxCenterX
+            val text = node.text?.toString()
+            if (!text.isNullOrBlank() && text.length <= 24 && !looksLikeTimestamp(text) &&
+                !WECHAT_TITLE_EXCLUDE_PUNCT.containsMatchIn(text)
             ) {
                 if (WECHAT_GROUP_COUNT_SUFFIX.containsMatchIn(text)) {
                     if (b.top < bestCountedTop) { bestCountedTop = b.top; bestCounted = text }
@@ -149,6 +175,10 @@ internal fun findWeChatTitle(
  */
 class QQAdapter : ChatAppAdapter {
     override val pkg = "com.tencent.mobileqq"
+
+    override fun extractTitle(root: AccessibilityNodeInfo, res: Resources): String? =
+        findTextForIdSuffixes(root, listOf("id/371"))
+            ?: findTitleInActionBar(root, Int.MAX_VALUE, res.displayMetrics.widthPixels, res)
 
     override fun extract(root: AccessibilityNodeInfo, res: Resources): ChatSnapshot? {
         val width = res.displayMetrics.widthPixels
@@ -288,6 +318,12 @@ internal fun collectFeishuBubbleRects(
 class FeishuAdapter : ChatAppAdapter {
     override val pkg = "com.ss.android.lark"
 
+    override fun extractTitle(root: AccessibilityNodeInfo, res: Resources): String? =
+        findTextForIdSuffixes(
+            root,
+            listOf("id/group_name", "id/thread_title_tv", "id/name_tv")
+        )
+
     override fun extract(root: AccessibilityNodeInfo, res: Resources): ChatSnapshot? {
         val width = res.displayMetrics.widthPixels
         val height = res.displayMetrics.heightPixels
@@ -309,7 +345,13 @@ class FeishuAdapter : ChatAppAdapter {
             val id = node.viewIdResourceName ?: ""
             if (id.endsWith(":id/message") || id.endsWith(":id/bubble_content_container") ||
                 id.endsWith(":id/kb_rich_text_content")) isChat = true
-            if (id.endsWith(":id/group_name")) node.text?.toString()?.let { if (title == null) title = it }
+            if (id.endsWith(":id/group_name") || id.endsWith(":id/thread_title_tv") ||
+                id.endsWith(":id/name_tv")
+            ) {
+                node.text?.toString()?.trim()?.takeIf { it.isNotEmpty() }?.let {
+                    if (title == null) title = it
+                }
+            }
 
             val text = node.text?.toString()
             val cls = node.className?.toString()
@@ -408,6 +450,9 @@ private fun parseXDesc(desc: String): Pair<String, String>? {
  */
 class XAdapter : ChatAppAdapter {
     override val pkg = "com.twitter.android"
+
+    override fun extractTitle(root: AccessibilityNodeInfo, res: Resources): String? =
+        findTitleInActionBar(root, Int.MAX_VALUE, res.displayMetrics.widthPixels, res, 0.15, 0.85)
 
     override fun extract(root: AccessibilityNodeInfo, res: Resources): ChatSnapshot? {
         val width = res.displayMetrics.widthPixels

@@ -24,6 +24,14 @@ android {
             dimension = "messenger"
             applicationId = "com.tencent.mm"
         }
+        create("feishu") {
+            dimension = "messenger"
+            applicationId = "com.ss.android.lark"
+        }
+        create("twitter") {
+            dimension = "messenger"
+            applicationId = "com.twitter.android"
+        }
     }
 
     buildTypes {

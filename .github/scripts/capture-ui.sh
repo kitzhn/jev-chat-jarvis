@@ -176,6 +176,11 @@ for attempt in range(10):
             m = re.match(r"\[(\d+),(\d+)\]\[(\d+),(\d+)\]", n.attrib.get("bounds",""))
             if m:
                 matches.append(tuple(map(int,m.groups())))
+    if mode == "absent":
+        if matches:
+            print(f"unexpected text present: {target}", file=sys.stderr)
+            sys.exit(1)
+        sys.exit(0)
     if matches:
         if mode == "wait":
             sys.exit(0)
@@ -319,13 +324,17 @@ PY
 # ---------------------------------------------------------------------------
 mark_stage "11-cross-app-install"
 # Cross-app integration fixtures. These are separate APKs whose runtime package
-# names match QQ / WeChat, so the real AccessibilityService and
+# names match the supported messengers, so the real AccessibilityService and
 # NotificationListener exercise cross-process routing rather than an in-process
 # demo. They contain no Tencent code and need no account login.
 QQ_FIXTURE="integration-fixture/build/outputs/apk/qq/debug/integration-fixture-qq-debug.apk"
 WECHAT_FIXTURE="integration-fixture/build/outputs/apk/wechat/debug/integration-fixture-wechat-debug.apk"
+FEISHU_FIXTURE="integration-fixture/build/outputs/apk/feishu/debug/integration-fixture-feishu-debug.apk"
+TWITTER_FIXTURE="integration-fixture/build/outputs/apk/twitter/debug/integration-fixture-twitter-debug.apk"
 adb install -r "$QQ_FIXTURE"
 adb install -r "$WECHAT_FIXTURE"
+adb install -r "$FEISHU_FIXTURE"
+adb install -r "$TWITTER_FIXTURE"
 adb shell pm grant com.tencent.mm android.permission.POST_NOTIFICATIONS || true
 
 SERVICE="$PKG/com.jev.probe.capture.ChatCaptureService"
@@ -333,8 +342,44 @@ adb shell settings put secure enabled_accessibility_services "$SERVICE"
 adb shell settings put secure accessibility_enabled 1
 adb shell cmd notification allow_listener "$PKG/com.jev.probe.capture.WeChatNotificationListener" 0 || true
 adb shell appops set "$PKG" SYSTEM_ALERT_WINDOW allow
-adb shell am start -W -n "$PKG/com.jev.probe.IntegrationSetupActivity" >/dev/null
+adb shell am start -W -n "$PKG/com.jev.probe.IntegrationSetupActivity" --ez allowFixtureChats false >/dev/null
 sleep 2
+
+mark_stage "10b-unlisted-denied"
+adb logcat -c
+adb shell am start -W -n "com.tencent.mobileqq/com.jev.fixture.FixtureActivity" >/dev/null
+sleep 2
+if adb logcat -d -v brief -s JEVASSIST:D | grep -q 'snapshot\[com.tencent.mobileqq\]'; then
+  echo "unlisted QQ message nodes were extracted" >&2
+  exit 1
+fi
+adb logcat -c
+adb shell am start -W -n "com.tencent.mm/com.jev.fixture.FixtureActivity" >/dev/null
+sleep 3
+if adb logcat -d -v brief -s JEVASSIST:I | grep -q 'ocr\[com.tencent.mm\]'; then
+  echo "unlisted WeChat screenshot/OCR was started" >&2
+  exit 1
+fi
+printf '%s\n' 'PASS: empty allowlist blocked QQ message extraction and WeChat screenshot/OCR' > integration-results/privacy-gate.txt
+
+adb logcat -c
+adb shell am start -W -n "com.twitter.android/com.jev.fixture.FixtureActivity" >/dev/null
+sleep 2
+if adb logcat -d -v brief -s JEVASSIST:D | grep -q 'snapshot\[com.twitter.android\]'; then
+  echo "unlisted X message nodes were extracted" >&2
+  exit 1
+fi
+adb logcat -c
+adb shell am start -W -n "com.ss.android.lark/com.jev.fixture.FixtureActivity" >/dev/null
+sleep 3
+if adb logcat -d -v brief -s JEVASSIST:I | grep -q 'ocr\[com.ss.android.lark\]'; then
+  echo "unlisted Feishu screenshot/OCR was started" >&2
+  exit 1
+fi
+printf '%s\n' 'PASS: empty allowlist blocked X and Feishu capture' >> integration-results/privacy-gate.txt
+
+adb shell am start -W -n "$PKG/com.jev.probe.IntegrationSetupActivity" --ez allowFixtureChats true >/dev/null
+sleep 1
 
 mark_stage "11-qq-accessibility"
 # QQ: real package routing + resource-id adapter + group speaker extraction.
@@ -352,10 +397,22 @@ sleep 2
 python3 /tmp/ui_text.py wait "QQ跨进程填入成功"
 adb exec-out screencap -p > screenshots/12-qq-fill.png
 
+mark_stage "12b-stale-fill-blocked"
+adb logcat -c
+adb shell am broadcast \
+  -n "$PKG/com.jev.probe.IntegrationCommandReceiver" \
+  -a "io.github.kitzhn.jevultimate.debug.FILL_FOR_TEST" \
+  --es text "跨会话旧候选不应写入" --ei delay_ms 1500 >/dev/null
+adb shell am start -W -n "com.tencent.mm/com.jev.fixture.FixtureActivity" >/dev/null
+sleep 2
+python3 /tmp/ui_text.py absent "跨会话旧候选不应写入"
+adb logcat -d -v brief -s JEVASSIST:I | grep -q 'fill: stale conversation; skipped'
+printf '%s\n' 'PASS: queued QQ reply was rejected after switching to WeChat' > integration-results/stale-fill-check.txt
+
 mark_stage "13-wechat-notification-ocr"
 # WeChat: notification -> title gate -> Accessibility screenshot -> local ML Kit
 # OCR. Message nodes are not consumed by an adapter in this path.
-adb shell am start -W -n "$PKG/com.jev.probe.IntegrationSetupActivity" >/dev/null
+adb shell am start -W -n "$PKG/com.jev.probe.IntegrationSetupActivity" --ez allowFixtureChats true >/dev/null
 adb logcat -c
 adb shell am start -W -n "com.tencent.mm/com.jev.fixture.FixtureActivity" >/dev/null
 sleep 6
@@ -370,5 +427,35 @@ sleep 2
 python3 /tmp/ui_text.py wait "微信跨进程填入成功"
 adb exec-out screencap -p > screenshots/14-wechat-fill.png
 
+mark_stage "15-x-adapter-fill"
+# X fixture: Compose-style content descriptions and the shared input-fill guard.
+adb logcat -c
+adb shell am start -W -n "com.twitter.android/com.jev.fixture.FixtureActivity" >/dev/null
+sleep 3
+adb logcat -d -v brief -s JEVASSIST:D > integration-results/x-accessibility.txt
+grep -E 'snapshot\[com\.twitter\.android\].*n=2' integration-results/x-accessibility.txt
+adb shell am broadcast \
+  -n "$PKG/com.jev.probe.IntegrationCommandReceiver" \
+  -a "io.github.kitzhn.jevultimate.debug.FILL_FOR_TEST" \
+  --es text "X 跨进程填入成功" >/dev/null
+sleep 2
+python3 /tmp/ui_text.py wait "X 跨进程填入成功"
+adb exec-out screencap -p > screenshots/15-x-fill.png
+
+mark_stage "16-feishu-ocr-fill"
+# Feishu fixture: bubble geometry + on-device OCR of each bubble rectangle.
+adb logcat -c
+adb shell am start -W -n "com.ss.android.lark/com.jev.fixture.FixtureActivity" >/dev/null
+sleep 6
+adb logcat -d -v brief -s JEVASSIST:I > integration-results/feishu-ocr.txt
+grep -E 'ocr\[com\.ss\.android\.lark\] msgs=[1-9]' integration-results/feishu-ocr.txt
+adb shell am broadcast \
+  -n "$PKG/com.jev.probe.IntegrationCommandReceiver" \
+  -a "io.github.kitzhn.jevultimate.debug.FILL_FOR_TEST" \
+  --es text "飞书跨进程填入成功" >/dev/null
+sleep 2
+python3 /tmp/ui_text.py wait "飞书跨进程填入成功"
+adb exec-out screencap -p > screenshots/16-feishu-fill.png
+
 mark_stage "PASS"
-printf '%s\n'   'QQ: package routing + accessibility adapter + 3 messages + fill PASS'   'WeChat: notification gate + accessibility screenshot + local OCR + fill PASS'   > integration-results/summary.txt
+printf '%s\n'   'Privacy: empty allowlist blocks QQ, X, WeChat, and Feishu capture PASS'   'Fill: stale reply discarded after conversation switch PASS'   'QQ: package routing + accessibility adapter + 3 messages + fill PASS'   'X: content-description adapter + 2 messages + fill PASS'   'Feishu: bubble geometry + local OCR + fill PASS'   'WeChat: notification gate + accessibility screenshot + local OCR + fill PASS'   > integration-results/summary.txt

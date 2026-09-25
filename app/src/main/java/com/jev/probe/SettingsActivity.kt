@@ -364,11 +364,14 @@ class SettingsActivity : AppCompatActivity() {
         card2.addView(label("关系描述（给 Jev 判断用）"))
         val relEdit = edit(prefs.relationship, Prefs.DEFAULT_REL)
         card2.addView(relEdit)
-        card2.addView(label("会话白名单（每行一个关键词，空=所有会话）"))
-        val wlEdit = edit(prefs.whitelist.joinToString("\n"), "留空则对所有会话生效").apply {
+        card2.addView(label("会话白名单（每行一个关键词，空=全部关闭）"))
+        val wlEdit = edit(prefs.whitelist.joinToString("\n"), "留空时不处理任何会话").apply {
             inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE; minLines = 2
         }
         card2.addView(wlEdit)
+        card2.addView(text(
+            "只读取会话标题来匹配白名单。留空、标题未识别或不匹配时，不读取消息正文、不截图 OCR、不分析。",
+            11f, sub))
         val autoRow = toggleRow("对方发消息时自动分析", prefs.autoAnalyze)
         card2.addView(autoRow)
         val relationshipWeightRow = toggleRow(
@@ -523,8 +526,10 @@ class SettingsActivity : AppCompatActivity() {
             prefs.deepSeekThinkingEnabled = (deepSeekThinkingRow.tag as? Boolean) ?: false
 
             prefs.relationship = relEdit.text.toString()   // blank stays blank, on purpose
-            prefs.whitelist = wlEdit.text.toString().split("\n")
-                .map { it.trim() }.filter { it.isNotEmpty() }.toSet()
+            prefs.whitelist = wlEdit.text.toString().lineSequence()
+                .map { it.trim() }
+                .filter { it.isNotEmpty() }
+                .toSet()
             prefs.autoAnalyze = (autoRow.tag as? Boolean) ?: true
             prefs.relationshipStrategyWeighting = (relationshipWeightRow.tag as? Boolean) ?: true
             prefs.strategyLearningEnabled = (strategyLearningRow.tag as? Boolean) ?: true

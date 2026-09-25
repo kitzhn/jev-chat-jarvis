@@ -236,10 +236,7 @@ class Prefs(context: Context, prefsName: String = PREFS_MAIN) {
         get() = sp.getBoolean(K_ENABLED, true)
         set(v) = sp.edit().putBoolean(K_ENABLED, v).apply()
 
-    /**
-     * Conversation whitelist: titles the assistant is allowed to act on. Empty
-     * set means "all conversations". Stored as a plain string set.
-     */
+    /** Conversation titles the assistant is allowed to read. Empty means none. */
     var whitelist: Set<String>
         get() = sp.getStringSet(K_WHITELIST, emptySet()) ?: emptySet()
         set(v) = sp.edit().putStringSet(K_WHITELIST, v).apply()
@@ -335,10 +332,7 @@ class Prefs(context: Context, prefsName: String = PREFS_MAIN) {
     }
 
     fun isAllowed(title: String?): Boolean {
-        val wl = whitelist
-        if (wl.isEmpty()) return true
-        if (title == null) return false
-        return wl.any { title.contains(it) }
+        return ConversationWhitelistGate.allows(title, whitelist)
     }
 
     /** Readiness gate: the judge route is the one that must be configured. */

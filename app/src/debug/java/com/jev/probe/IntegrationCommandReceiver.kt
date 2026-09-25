@@ -10,7 +10,8 @@ class IntegrationCommandReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action != ACTION_FILL) return
         val text = intent.getStringExtra("text").orEmpty()
-        if (text.isNotBlank()) ChatCaptureService.debugFillForTest(text)
+        val delayMs = intent.getLongExtra("delay_ms", 0L)
+        if (text.isNotBlank()) ChatCaptureService.debugFillForTest(text, delayMs)
     }
 
     companion object {
