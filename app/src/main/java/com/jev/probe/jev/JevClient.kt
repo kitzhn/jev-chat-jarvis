@@ -28,9 +28,10 @@ class JevClient(private val prefs: Prefs) {
     ): List<RankedReply> {
         val candidates = replyClient.draft(snapshot, relationship, ctx)
         val judged = judgeClient.rank(snapshot, relationship, candidates, ctx)
+        val scene = ConversationSceneDetector.detect(snapshot)
         return if (prefs.relationshipStrategyWeighting)
-            RelationshipStrategyPolicy.rerank(judged, ctx?.contact)
-        else judged
+            RelationshipStrategyPolicy.rerank(judged, ctx?.contact, scene)
+        else judged.map { it.copy(scene = scene, sceneWeight = 1.0, habitWeight = 1.0, relationWeight = 1.0) }
     }
 
 
