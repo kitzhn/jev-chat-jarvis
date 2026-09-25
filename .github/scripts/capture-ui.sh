@@ -104,17 +104,23 @@ json.dump(contacts, open("demo/contacts.json","w"), ensure_ascii=False)
 json.dump(graph, open("demo/contact_relations.json","w"), ensure_ascii=False)
 json.dump(events, open("demo/relations/demo-a.json","w"), ensure_ascii=False)
 json.dump(logs, open("demo/logs/demo-a.json","w"), ensure_ascii=False)
+# Seed an oversized legacy v1 array to regression-test MAJOR-02/03/06 migration:
+# >5000 detail rows must roll up without changing the monthly request total;
+# non-exact vision input must become token-unknown; URL credentials must be scrubbed.
 usage = [
-  {"ts":now-3600000,"route":"判断接口","baseUrl":"https://openrouter.ai/api","model":"typesafe/jev-1.13",
-   "inputTokens":12800,"outputTokens":0,"cachedInputTokens":0,"costCny":0.00361,"exactTokens":True,"pricingKnown":True},
-  {"ts":now-3000000,"route":"判断接口","baseUrl":"https://openrouter.ai/api","model":"typesafe/jev-1.13",
-   "inputTokens":8400,"outputTokens":0,"cachedInputTokens":0,"costCny":0.00237,"exactTokens":True,"pricingKnown":True},
+  {"ts":now-(5001-i)*1000,"route":"判断接口","baseUrl":"https://openrouter.ai/api","model":"typesafe/jev-1.13",
+   "inputTokens":1000,"outputTokens":0,"cachedInputTokens":0,"costCny":0.00028,"exactTokens":True,"pricingKnown":True}
+  for i in range(5001)
+]
+usage += [
   {"ts":now-2400000,"route":"回复接口","baseUrl":"https://openrouter.ai/api/v1","model":"deepseek/deepseek-v4.1-flash",
    "inputTokens":18500,"outputTokens":1450,"cachedInputTokens":3200,"costCny":0.0189,"exactTokens":True,"pricingKnown":True},
   {"ts":now-1800000,"route":"回复接口","baseUrl":"https://api.deepseek.com/v1","model":"deepseek-flash",
    "inputTokens":22000,"outputTokens":1800,"cachedInputTokens":9000,"costCny":0.0202,"exactTokens":True,"pricingKnown":True},
-  {"ts":now-1200000,"route":"视觉接口","baseUrl":"https://api.deepseek.com/v1","model":"deepseek-flash",
-   "inputTokens":9400,"outputTokens":320,"cachedInputTokens":0,"costCny":0.0120,"exactTokens":False,"pricingKnown":True}
+  {"ts":now-1200000,"route":"视觉接口","baseUrl":"https://user:pass@api.deepseek.com/v1?key=SECRET#frag","model":"deepseek-flash",
+   "inputTokens":9400,"outputTokens":320,"cachedInputTokens":0,"costCny":0.0120,"exactTokens":False,"pricingKnown":True},
+  {"ts":now-600000,"route":"判断接口","baseUrl":"https://openrouter.ai/api","model":"typesafe/jev-1.13",
+   "inputTokens":900,"outputTokens":0,"cachedInputTokens":0,"costCny":0.00025,"exactTokens":True,"pricingKnown":True}
 ]
 os.makedirs("demo/usage", exist_ok=True)
 json.dump(usage, open("demo/usage/api_usage.json","w"), ensure_ascii=False)
@@ -198,6 +204,10 @@ wait_activity "$PKG/com.jev.probe.SettingsActivity"
 sleep 1
 adb exec-out screencap -p > screenshots/02-settings.png
 
+# MAJOR-09: the advanced DeepSeek thinking control exists and defaults to OFF.
+python3 /tmp/ui_text.py contains "DeepSeek 官方：启用 thinking（高级）"
+adb exec-out screencap -p > screenshots/02b-deepseek-thinking.png
+
 mark_stage "03-knowledge"
 adb shell am start -W -n "$PKG/com.jev.probe.KnowledgeActivity" >/dev/null
 wait_activity "$PKG/com.jev.probe.KnowledgeActivity"
@@ -271,9 +281,32 @@ adb exec-out screencap -p > screenshots/09-adaptive-core.png
 mark_stage "10-api-dashboard"
 # API usage dashboard: real production activity reading local-only usage records.
 adb shell am start -W -n "$PKG/com.jev.probe.ApiUsageActivity" >/dev/null
-sleep 1
+sleep 2
 python3 /tmp/ui_text.py wait "API 消耗仪表盘"
+python3 /tmp/ui_text.py wait "5005 次请求"
+python3 /tmp/ui_text.py wait "1 次图片 token 未知"
 adb exec-out screencap -p > screenshots/10-api-usage-dashboard.png
+
+# Verify migration/persistence, not just the rendered labels.
+adb shell "run-as $PKG cat files/usage/api_usage.json" > integration-results/api-usage-v2.json
+python3 - <<'PY'
+import json
+p = "integration-results/api-usage-v2.json"
+data = json.load(open(p))
+assert data["version"] == 2, data.get("version")
+assert len(data["records"]) == 5000, len(data["records"])
+assert sum(x["requests"] for x in data["rollups"]) == 5, data["rollups"]
+raw = open(p, encoding="utf-8").read()
+assert "SECRET" not in raw and "user:pass" not in raw and "?key=" not in raw
+vision = [x for x in data["records"] if x["route"] == "视觉接口"]
+assert len(vision) == 1, len(vision)
+assert vision[0]["baseUrl"] == "https://api.deepseek.com/v1", vision[0]["baseUrl"]
+assert vision[0]["tokenKnown"] is False
+assert vision[0]["inputTokens"] == 0
+open("integration-results/api-usage-check.txt","w").write(
+    "PASS: 5005 monthly requests preserved; 5 rows rolled up; vision tokens unknown; URL credentials scrubbed.\n"
+)
+PY
 
 # ---------------------------------------------------------------------------
 mark_stage "11-cross-app-install"
