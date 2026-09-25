@@ -517,6 +517,7 @@ class OverlayController(private val ctx: Context) {
         onFill: (String) -> Unit
     ): View {
         val labels = listOf("A", "B", "C", "D")
+        val styles = listOf("温柔承接", "轻松自然", "稳妥克制", "主动推进")
         val accent = when (index) {
             0 -> Color.parseColor("#3A7AFE")
             1 -> Color.parseColor("#6D5DFB")
@@ -570,7 +571,7 @@ class OverlayController(private val ctx: Context) {
                 0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
         }
         middle.addView(TextView(ctx).apply {
-            this.text = if (index == 0) "推荐选项" else "备选 " + labels.getOrElse(index) { "?" }
+            this.text = styles.getOrElse(index) { "对话选项" } + if (index == 0) " · 推荐" else ""
             setTextColor(accent)
             textSize = 10.5f
             setTypeface(typeface, Typeface.BOLD)
