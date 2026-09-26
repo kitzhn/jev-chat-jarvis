@@ -216,7 +216,7 @@ object ApiUsageStore {
     }
 
     fun clear(context: Context) = synchronized(lock) {
-        usageFile(context).delete()
+        AtomicFile(usageFile(context)).delete()
     }
 
     private fun summarizeRecords(records: List<ApiUsageRecord>): ApiUsageSummary =
@@ -383,7 +383,7 @@ object ApiUsageStore {
     private fun fallbackSanitizeUrl(raw: String): String {
         val noQuery = raw.substringBefore('#').substringBefore('?')
         val marker = noQuery.indexOf("://")
-        if (marker < 0) return noQuery
+        if (marker < 0) return ""
         val prefix = noQuery.substring(0, marker + 3)
         val rest = noQuery.substring(marker + 3)
         val authority = rest.substringBefore('/')
