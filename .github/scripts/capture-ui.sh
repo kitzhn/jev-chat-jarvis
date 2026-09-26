@@ -167,6 +167,18 @@ def dump():
 
 for attempt in range(10):
     root = dump()
+    # The Google APIs emulator occasionally shows a setup-wizard ANR above
+    # Jev. Dismiss that system dialog before looking for app controls.
+    nodes = list(root.iter("node"))
+    if any("googlesdksetup isn't responding" in n.attrib.get("text", "") for n in nodes):
+        close = next((n for n in nodes if n.attrib.get("text") == "Close app"), None)
+        if close:
+            m = re.match(r"\[(\d+),(\d+)\]\[(\d+),(\d+)\]", close.attrib.get("bounds", ""))
+            if m:
+                x1,y1,x2,y2 = map(int,m.groups())
+                subprocess.run(["adb","shell","input","tap",str((x1+x2)//2),str((y1+y2)//2)],check=True)
+                time.sleep(.5)
+                continue
     matches = []
     for n in root.iter("node"):
         text = n.attrib.get("text","")
