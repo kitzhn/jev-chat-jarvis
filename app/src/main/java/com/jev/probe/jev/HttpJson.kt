@@ -62,6 +62,7 @@ object HttpJson {
             try {
                 conn = (URL(url).openConnection() as HttpURLConnection).apply {
                     requestMethod = "POST"
+                    instanceFollowRedirects = false
                     connectTimeout = 15000
                     readTimeout = 40000
                     doOutput = true
@@ -72,6 +73,11 @@ object HttpJson {
                 val bytes = body.toString().toByteArray(Charsets.UTF_8)
                 conn.outputStream.use { os: OutputStream -> os.write(bytes) }
                 val code = conn.responseCode
+                // Do not forward a bearer token or chat content to a Location
+                // supplied by an endpoint (including HTTPS-to-HTTP redirects).
+                if (code in 300..399) {
+                    throw ApiException(route, code, "接口返回重定向，已拒绝转发请求")
+                }
                 if (code == 429 || code == 529) {
                     last = ApiException(route, code, "服务繁忙，已重试")
                     attempt++
@@ -91,7 +97,7 @@ object HttpJson {
                 if (text.isBlank()) throw ApiException(route, code, "响应体为空")
                 return JSONObject(text)
             } catch (e: ApiException) {
-                if (e.status != null && e.status in 400..499) throw e  // client error: no retry
+                if (e.status != null && e.status in 300..499) throw e  // redirect/client error: no retry
                 last = e
                 attempt++
                 if (attempt < MAX_ATTEMPTS) Thread.sleep(500L * (1L shl attempt))

@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "Release tag（留空则自动使用 app versionName，如 v2.5.0）"
+        description: "Release tag（留空则自动使用 app versionName，如 v2.5.1）"
         required: false
         type: string
   push:
@@ -130,8 +130,8 @@ jobs:
           VERSION: ${{ steps.release_meta.outputs.version }}
         run: |
           if gh release view "$TAG" >/dev/null 2>&1; then
-            gh release upload "$TAG"               jev-ultimate-arm64.apk               jev-ultimate-arm64.apk.sha256               --clobber
-            gh release edit "$TAG"               --title "Jev Ultimate $VERSION"               --latest
+            echo "::error::Release $TAG already exists; bump the version instead of replacing a published APK"
+            exit 1
           else
             gh release create "$TAG"               jev-ultimate-arm64.apk               jev-ultimate-arm64.apk.sha256               --title "Jev Ultimate $VERSION"               --notes "Jev Ultimate $VERSION 正式签名版。Android 11+，ARM64。建议从此 Release 安装和更新；SHA-256 校验文件随 APK 一并提供。"               --latest
           fi

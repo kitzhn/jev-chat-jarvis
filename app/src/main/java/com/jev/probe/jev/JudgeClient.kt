@@ -100,7 +100,7 @@ class JudgeClient(private val prefs: Prefs) {
             .put("questions", questions)
         val resp = HttpJson.post(url, prefs.judgeKey, body, Route.JUDGE, HttpJson.headersFor(url))
         val answers = resp.optJSONObject("answers") ?: JSONObject()
-        ApiUsageStore.record(
+        ApiUsageStore.recordSafely(
             prefs.appContext, Route.JUDGE, prefs.judgeBaseUrl, prefs.judgeModel,
             body.toString(), resp, answers.toString()
         )

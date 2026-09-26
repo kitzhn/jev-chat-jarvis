@@ -29,8 +29,8 @@ android {
             if (System.getenv("JEV_INTEGRATION_FIXTURES") == "1") "true" else "false"
         minSdk = 30
         targetSdk = 35
-        versionCode = 25
-        versionName = "2.5.0"
+        versionCode = 26
+        versionName = "2.5.1"
 
         // ML Kit's bundled Chinese recognizer ships native libs for every ABI.
         // The target phone (and every phone this can run on: minSdk 30) is
