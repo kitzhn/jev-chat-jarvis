@@ -167,6 +167,18 @@ def dump():
 
 for attempt in range(10):
     root = dump()
+    # The Google APIs emulator occasionally shows a setup-wizard ANR above
+    # Jev. Dismiss that system dialog before looking for app controls.
+    nodes = list(root.iter("node"))
+    if any("googlesdksetup isn't responding" in n.attrib.get("text", "") for n in nodes):
+        close = next((n for n in nodes if n.attrib.get("text") == "Close app"), None)
+        if close:
+            m = re.match(r"\[(\d+),(\d+)\]\[(\d+),(\d+)\]", close.attrib.get("bounds", ""))
+            if m:
+                x1,y1,x2,y2 = map(int,m.groups())
+                subprocess.run(["adb","shell","input","tap",str((x1+x2)//2),str((y1+y2)//2)],check=True)
+                time.sleep(.5)
+                continue
     matches = []
     for n in root.iter("node"):
         text = n.attrib.get("text","")
@@ -313,13 +325,23 @@ raw = open(p, encoding="utf-8").read()
 assert "SECRET" not in raw and "user:pass" not in raw and "?key=" not in raw
 vision = [x for x in data["records"] if x["route"] == "视觉接口"]
 assert len(vision) == 1, len(vision)
-assert vision[0]["baseUrl"] == "https://api.deepseek.com/v1", vision[0]["baseUrl"]
+assert vision[0]["baseUrl"] == "https://api.deepseek.com", vision[0]["baseUrl"]
 assert vision[0]["tokenKnown"] is False
 assert vision[0]["inputTokens"] == 0
 open("integration-results/api-usage-check.txt","w").write(
     "PASS: 5005 monthly requests preserved; 5 rows rolled up; vision tokens unknown; URL credentials scrubbed.\n"
 )
 PY
+
+# A corrupt ledger must remain intact and must be reported, never reset to zero.
+adb shell "run-as $PKG cp files/usage/api_usage.json files/usage/api_usage.saved"
+adb shell "run-as $PKG sh -c 'printf invalid-json > files/usage/api_usage.json'"
+adb shell am force-stop "$PKG"
+adb shell am start -W -n "$PKG/com.jev.probe.ApiUsageActivity" >/dev/null
+python3 /tmp/ui_text.py wait "API 用量记录读取失败"
+test "$(adb shell "run-as $PKG cat files/usage/api_usage.json" | tr -d '\r')" = 'invalid-json'
+adb shell "run-as $PKG mv files/usage/api_usage.saved files/usage/api_usage.json"
+printf '%s\n' 'PASS: corrupt usage ledger preserved and dashboard reports failure' > integration-results/api-usage-corruption.txt
 
 # ---------------------------------------------------------------------------
 mark_stage "11-cross-app-install"

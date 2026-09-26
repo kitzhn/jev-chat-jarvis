@@ -1,6 +1,8 @@
 package com.jev.probe.core.usage
 
 import android.content.Context
+import android.util.AtomicFile
+import android.util.Log
 import com.jev.probe.jev.Route
 import org.json.JSONArray
 import org.json.JSONObject
@@ -83,6 +85,18 @@ object ApiUsageStore {
     private const val ROLLUP_RETENTION_DAYS = 400L
     private const val STATE_VERSION = 2
     private const val USD_CNY = 6.71
+
+    /** Metering must never turn an already successful, billable API call into an error. */
+    fun recordSafely(
+        context: Context, route: String, baseUrl: String, model: String,
+        requestBody: String, response: JSONObject, outputText: String = ""
+    ) {
+        try {
+            record(context, route, baseUrl, model, requestBody, response, outputText)
+        } catch (e: Exception) {
+            Log.e("ApiUsageStore", "Local metering failed; API response remains valid", e)
+        }
+    }
 
     fun record(
         context: Context,
@@ -202,7 +216,7 @@ object ApiUsageStore {
     }
 
     fun clear(context: Context) = synchronized(lock) {
-        usageFile(context).delete()
+        AtomicFile(usageFile(context)).delete()
     }
 
     private fun summarizeRecords(records: List<ApiUsageRecord>): ApiUsageSummary =
@@ -361,7 +375,7 @@ object ApiUsageStore {
                 append("://")
                 append(safeHost)
                 if (uri.port >= 0) append(":").append(uri.port)
-                append(uri.rawPath.orEmpty())
+                // Paths may contain API keys (even when query/userinfo do not).
             }
         }.getOrElse { fallbackSanitizeUrl(value) }
     }
@@ -369,13 +383,11 @@ object ApiUsageStore {
     private fun fallbackSanitizeUrl(raw: String): String {
         val noQuery = raw.substringBefore('#').substringBefore('?')
         val marker = noQuery.indexOf("://")
-        if (marker < 0) return noQuery
+        if (marker < 0) return ""
         val prefix = noQuery.substring(0, marker + 3)
         val rest = noQuery.substring(marker + 3)
-        val slash = rest.indexOf('/')
-        val authority = if (slash >= 0) rest.substring(0, slash) else rest
-        val path = if (slash >= 0) rest.substring(slash) else ""
-        return prefix + authority.substringAfterLast('@') + path
+        val authority = rest.substringBefore('/')
+        return prefix + authority.substringAfterLast('@')
     }
 
     private fun usageFile(context: Context): File =
@@ -383,9 +395,10 @@ object ApiUsageStore {
 
     private fun loadState(context: Context): UsageState {
         val file = usageFile(context)
-        if (!file.exists()) return UsageState(mutableListOf(), mutableListOf())
-        return runCatching {
-            val raw = file.readText()
+        if (!file.exists() && !File(file.path + ".bak").exists())
+            return UsageState(mutableListOf(), mutableListOf())
+        return try {
+            val raw = AtomicFile(file).openRead().bufferedReader(Charsets.UTF_8).use { it.readText() }
             val trimmed = raw.trimStart()
             var needsMigration = false
             val state = if (trimmed.startsWith("[")) {
@@ -410,7 +423,10 @@ object ApiUsageStore {
             if (state.rollups.size != rollupCount) needsMigration = true
             if (needsMigration) writeState(context, state)
             state
-        }.getOrDefault(UsageState(mutableListOf(), mutableListOf()))
+        } catch (e: Exception) {
+            // Never replace an unreadable ledger with an apparently empty one.
+            throw IllegalStateException("API 用量记录读取失败，原文件已保留", e)
+        }
     }
 
     private fun parseRecords(
@@ -544,11 +560,14 @@ object ApiUsageStore {
             .put("records", records)
             .put("rollups", rollups)
         val file = usageFile(context)
-        val tmp = File(file.parentFile, file.name + ".tmp")
-        tmp.writeText(root.toString())
-        if (!tmp.renameTo(file)) {
-            file.writeText(root.toString())
-            tmp.delete()
+        val atomic = AtomicFile(file)
+        val output = atomic.startWrite()
+        try {
+            output.write(root.toString().toByteArray(Charsets.UTF_8))
+            atomic.finishWrite(output)
+        } catch (e: Exception) {
+            atomic.failWrite(output)
+            throw e
         }
     }
 }

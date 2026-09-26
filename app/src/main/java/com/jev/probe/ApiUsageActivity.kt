@@ -50,9 +50,14 @@ class ApiUsageActivity : AppCompatActivity() {
 
     private fun render() {
         root.removeAllViews()
-        val month = ApiUsageStore.currentMonth(this)
-        val today = ApiUsageStore.today(this)
-        val breakdown = ApiUsageStore.currentMonthBreakdown(this)
+        val usage = try {
+            Triple(ApiUsageStore.currentMonth(this), ApiUsageStore.today(this),
+                ApiUsageStore.currentMonthBreakdown(this))
+        } catch (e: IllegalStateException) {
+            root.addView(text("API 用量记录读取失败，原文件已保留。请勿清空统计；可从应用数据中备份后修复。", 14f, ink, true))
+            return
+        }
+        val (month, today, breakdown) = usage
 
         root.addView(text("API 消耗仪表盘", 24f, ink, true))
         root.addView(text("只统计本机 Jev Ultimate 发出的请求；不保存聊天正文、Prompt 或 API Key。",
