@@ -313,13 +313,23 @@ raw = open(p, encoding="utf-8").read()
 assert "SECRET" not in raw and "user:pass" not in raw and "?key=" not in raw
 vision = [x for x in data["records"] if x["route"] == "视觉接口"]
 assert len(vision) == 1, len(vision)
-assert vision[0]["baseUrl"] == "https://api.deepseek.com/v1", vision[0]["baseUrl"]
+assert vision[0]["baseUrl"] == "https://api.deepseek.com", vision[0]["baseUrl"]
 assert vision[0]["tokenKnown"] is False
 assert vision[0]["inputTokens"] == 0
 open("integration-results/api-usage-check.txt","w").write(
     "PASS: 5005 monthly requests preserved; 5 rows rolled up; vision tokens unknown; URL credentials scrubbed.\n"
 )
 PY
+
+# A corrupt ledger must remain intact and must be reported, never reset to zero.
+adb shell "run-as $PKG cp files/usage/api_usage.json files/usage/api_usage.saved"
+adb shell "run-as $PKG sh -c 'printf invalid-json > files/usage/api_usage.json'"
+adb shell am force-stop "$PKG"
+adb shell am start -W -n "$PKG/com.jev.probe.ApiUsageActivity" >/dev/null
+python3 /tmp/ui_text.py wait "API 用量记录读取失败"
+test "$(adb shell "run-as $PKG cat files/usage/api_usage.json" | tr -d '\r')" = 'invalid-json'
+adb shell "run-as $PKG mv files/usage/api_usage.saved files/usage/api_usage.json"
+printf '%s\n' 'PASS: corrupt usage ledger preserved and dashboard reports failure' > integration-results/api-usage-corruption.txt
 
 # ---------------------------------------------------------------------------
 mark_stage "11-cross-app-install"
