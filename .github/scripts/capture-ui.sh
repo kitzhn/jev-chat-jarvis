@@ -167,11 +167,23 @@ def dump():
 
 for attempt in range(10):
     root = dump()
-    # The Google APIs emulator occasionally shows a setup-wizard ANR above
-    # Jev. Dismiss that system dialog before looking for app controls.
     nodes = list(root.iter("node"))
-    if any("googlesdksetup isn't responding" in n.attrib.get("text", "") for n in nodes):
-        close = next((n for n in nodes if n.attrib.get("text") == "Close app"), None)
+    # Cold boots can leave a known Android system app ANR above Jev. Dismiss
+    # launcher/setup-wizard ANRs, while preserving any dialog from the app.
+    anr_titles = [
+        n.attrib.get("text", "").strip().lower()
+        for n in nodes
+        if "isn't responding" in n.attrib.get("text", "").lower()
+    ]
+    known_system_anr = any(
+        "googlesdksetup" in title or "pixel launcher" in title
+        for title in anr_titles
+    )
+    if known_system_anr:
+        close = next(
+            (n for n in nodes if n.attrib.get("text", "").strip() in ("Close app", "关闭应用")),
+            None
+        )
         if close:
             m = re.match(r"\[(\d+),(\d+)\]\[(\d+),(\d+)\]", close.attrib.get("bounds", ""))
             if m:
