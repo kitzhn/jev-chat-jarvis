@@ -29,7 +29,7 @@
 >
 > 正式发布工作流会读取 App 的 `versionName` 生成版本标签，并将签名 APK 以固定文件名 `jev-ultimate-arm64.apk` 发布到 GitHub Releases，同时附带 SHA-256 校验文件。当前版本为 `v2.5.2`： [下载最新 ARM64 APK](https://github.com/kitzhn/jev-chat-jarvis/releases/latest/download/jev-ultimate-arm64.apk) · [下载 SHA-256](https://github.com/kitzhn/jev-chat-jarvis/releases/latest/download/jev-ultimate-arm64.apk.sha256) · [查看 v2.5.2 发布页](https://github.com/kitzhn/jev-chat-jarvis/releases/tag/v2.5.2)。
 >
-> 发布签名推荐配置 `JEV_RELEASE_BUNDLE_B64`（包含 keystore 与签名参数）；工作流也兼容旧的四项签名 Secret。配置后，推送与 App 版本一致的 `v*` 标签会自动构建发布，也可在 Actions 中手动运行发布工作流。
+> 发布签名推荐配置 `JEV_RELEASE_BUNDLE_B64`（包含 keystore 与签名参数）；工作流也兼容旧的四项签名 Secret。推送与 App 版本一致的 `v*` 标签会自动构建发布；在 Actions 从 `main` 手动运行时，工作流会先校验并创建匹配 `versionName` 的标签，再从标签启动签名发布，继续遵守 `release` 环境审批规则。
 >
 > 给朋友使用请先看：[**Jev Ultimate 中文使用说明书**](docs/USER_GUIDE_ZH.md)  
 > OpenRouter 无密钥配置示例：[docs/api-config-openrouter.example.json](docs/api-config-openrouter.example.json) · [代码审阅记录](docs/CODE_REVIEW_2026-09-25.md)
