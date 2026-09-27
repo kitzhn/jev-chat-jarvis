@@ -649,7 +649,7 @@ GitHub Actions 会自动构建 Debug APK。
 
 Ultimate Debug 版本名：
 
-`2.5.0-debug`
+`2.5.2-debug`
 
 
 ## 25. 固定签名与长期更新
@@ -658,7 +658,7 @@ Ultimate Debug 版本名：
 
 如果要长期发给朋友并且以后希望“直接覆盖升级、不丢本地数据”，请使用固定 Release 签名。
 
-仓库已经提供手动工作流：
+仓库已经提供发布工作流，可通过推送与 App `versionName` 一致的 `v*` 标签自动发布，也可在 Actions 中手动运行：
 
 **Actions → Build Signed Ultimate Release**
 
@@ -666,7 +666,11 @@ Ultimate Debug 版本名：
 
 `io.github.kitzhn.jevultimate`
 
-需要在 GitHub 仓库 Settings → Secrets and variables → Actions 中添加 4 个 Secrets：
+推荐在 GitHub 仓库 Settings → Secrets and variables → Actions 中配置一个 Secret：
+
+- `JEV_RELEASE_BUNDLE_B64`：包含 Base64 keystore 和签名参数的 JSON 内容
+
+工作流仍兼容以下四个旧版 Secrets：
 
 - `JEV_KEYSTORE_B64`：keystore 文件的 Base64 内容
 - `JEV_STORE_PASSWORD`
@@ -675,9 +679,9 @@ Ultimate Debug 版本名：
 
 这些 Secrets 不会写入仓库。
 
-配置后手动运行 Release workflow，会生成：
+配置后运行 Release workflow，会生成签名 APK 和 SHA-256 校验文件，并发布到 GitHub Releases：
 
-`jev-ultimate-release`
+[下载正式版 APK](https://github.com/kitzhn/jev-chat-jarvis/releases/latest/download/jev-ultimate-arm64.apk) · [SHA-256 校验文件](https://github.com/kitzhn/jev-chat-jarvis/releases/latest/download/jev-ultimate-arm64.apk.sha256) · [全部正式版本](https://github.com/kitzhn/jev-chat-jarvis/releases)
 
 请长期保存原始 keystore。以后所有正式版本必须使用同一签名，否则 Android 无法覆盖安装旧版本。
 

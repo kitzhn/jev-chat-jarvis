@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "Release tag（留空则自动使用 app versionName，如 v2.5.1）"
+        description: "Release tag（留空则自动使用 app versionName，例如 v2.5.2）"
         required: false
         type: string
   push:
@@ -129,11 +129,26 @@ jobs:
           TAG: ${{ steps.release_meta.outputs.tag }}
           VERSION: ${{ steps.release_meta.outputs.version }}
         run: |
+          NOTES_FILE="$RUNNER_TEMP/jev-release-notes.md"
+          awk -v heading="## v${VERSION} Ultimate" '
+            index($0, heading) == 1 { in_section=1; next }
+            in_section && /^## / { exit }
+            in_section { print }
+          ' CHANGELOG.md > "$NOTES_FILE"
+          if [ ! -s "$NOTES_FILE" ]; then
+            echo "::error::No CHANGELOG.md section found for v$VERSION"
+            exit 1
+          fi
           if gh release view "$TAG" >/dev/null 2>&1; then
             echo "::error::Release $TAG already exists; bump the version instead of replacing a published APK"
             exit 1
           else
-            gh release create "$TAG"               jev-ultimate-arm64.apk               jev-ultimate-arm64.apk.sha256               --title "Jev Ultimate $VERSION"               --notes "Jev Ultimate $VERSION 正式签名版。Android 11+，ARM64。建议从此 Release 安装和更新；SHA-256 校验文件随 APK 一并提供。"               --latest
+            gh release create "$TAG" \
+              jev-ultimate-arm64.apk \
+              jev-ultimate-arm64.apk.sha256 \
+              --title "Jev Ultimate $VERSION" \
+              --notes-file "$NOTES_FILE" \
+              --latest
           fi
 
       - name: Show stable download links
@@ -141,3 +156,4 @@ jobs:
         run: |
           echo "Release page: https://github.com/${GITHUB_REPOSITORY}/releases/latest"
           echo "APK: https://github.com/${GITHUB_REPOSITORY}/releases/latest/download/jev-ultimate-arm64.apk"
+          echo "SHA-256: https://github.com/${GITHUB_REPOSITORY}/releases/latest/download/jev-ultimate-arm64.apk.sha256"
