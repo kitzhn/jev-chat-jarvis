@@ -15,8 +15,8 @@ import androidx.core.view.WindowInsetsCompat
  * cutout changes) cannot pile padding up. Horizontal padding is left alone —
  * only top and bottom are at issue here.
  *
- * Applied to the content container of [MainActivity], [SettingsActivity] and
- * [KnowledgeActivity]; nothing in the theme is touched.
+ * Applied to the content containers of the programmatic app screens; nothing
+ * in the theme is touched.
  */
 fun View.padForSystemBars() {
     val baseTop = paddingTop

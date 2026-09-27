@@ -1,10 +1,12 @@
 package com.jev.probe.core.kb
 
 import android.content.Context
+import android.util.AtomicFile
 import android.util.Log
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
+import java.io.FileOutputStream
 
 /** Note / contact / history counts, for the settings screen. */
 data class KbCounts(
@@ -21,10 +23,10 @@ data class KbCounts(
  *   kb/contacts.json        all contacts
  *   kb/logs/<contactId>.json per-contact chat history (≤ 300 lines)
  *
- * Single writer by construction: every read and write goes through one lock, and
- * writes land via a temp file + rename so a kill mid-write can never leave half
- * a JSON document behind. Serialization is hand-written org.json (no Gson/Moshi
- * dependency). Chat text never reaches logcat — only counts and lengths.
+ * Single writer by construction: every read and write goes through one lock.
+ * Android AtomicFile restores the last complete document after an interrupted
+ * write. Serialization is hand-written org.json (no Gson/Moshi dependency).
+ * Chat text never reaches logcat — only counts and lengths.
  */
 class KbStore private constructor(context: Context) {
 
@@ -390,33 +392,53 @@ class KbStore private constructor(context: Context) {
         logCache.remove(sourceId)
         relationCache.remove(sourceId)
         lastScreenCache.remove(sourceId)
-        runCatching { logFile(sourceId).delete() }
-        runCatching { screenFile(sourceId).delete() }
-        runCatching { relationFile(sourceId).delete() }
+        listOf(logFile(sourceId), screenFile(sourceId), relationFile(sourceId)).forEach {
+            if (!deleteAtomicFile(it)) Log.w(TAG, "failed to delete merged source file ${it.name}")
+        }
         return true
     }
 
-    /** Removes the contact and its history file. */
+    /** Removes the contact only after both index files are safely updated. */
     fun deleteContact(id: String): Boolean = synchronized(lock) {
-        val list = loadContacts()
-        var ok = true
-        if (list.removeAll { it.id == id }) {
-            ok = writeAtomic(contactsFile, contactsJson(list))
-            if (!ok) contactsCache = null
+        val oldContacts = loadContacts().toList()
+        if (oldContacts.none { it.id == id }) return@synchronized false
+        val newContacts = oldContacts.filterNot { it.id == id }
+
+        val oldEdges = loadContactRelations().toList()
+        val newEdges = oldEdges.filterNot { it.fromId == id || it.toId == id }
+
+        val completed = ContactDeleteCommit.execute(
+            writeContacts = { writeAtomic(contactsFile, contactsJson(newContacts)) },
+            writeRelations = { writeAtomic(graphFile, contactRelationsJson(newEdges)) },
+            restoreContacts = {
+                writeAtomic(contactsFile, contactsJson(oldContacts)).also { restored ->
+                    if (!restored) Log.e(TAG, "failed to roll back contacts after relation-write failure")
+                }
+            },
+            deleteHistory = {
+                logCache.remove(id)
+                relationCache.remove(id)
+                lastScreenCache.remove(id)
+                var deleted = true
+                listOf(logFile(id), screenFile(id), relationFile(id)).forEach { file ->
+                    if (!deleteAtomicFile(file)) {
+                        deleted = false
+                        Log.w(TAG, "failed to delete ${file.name} after contact removal")
+                    }
+                }
+                deleted
+            }
+        )
+        // Reload persisted state after any failed stage (including a failed
+        // rollback); never leave caches claiming a partial commit was complete.
+        if (completed) {
+            contactsCache = newContacts.toMutableList()
+            graphCache = newEdges.toMutableList()
+        } else {
+            contactsCache = null
+            graphCache = null
         }
-        logCache.remove(id)
-        relationCache.remove(id)
-        lastScreenCache.remove(id)
-        runCatching { logFile(id).delete() }
-        runCatching { screenFile(id).delete() }
-        runCatching { relationFile(id).delete() }
-        val edges = loadContactRelations()
-        if (edges.removeAll { it.fromId == id || it.toId == id }) {
-            val graphOk = writeAtomic(graphFile, contactRelationsJson(edges))
-            if (!graphOk) graphCache = null
-            ok = ok && graphOk
-        }
-        ok
+        completed
     }
 
     /**
@@ -643,6 +665,189 @@ class KbStore private constructor(context: Context) {
         runCatching { root.deleteRecursively() }
         Log.i(TAG, "kb cleared")
         Unit
+    }
+
+    /** Snapshot committed knowledge-base files under the store lock. */
+    internal fun exportBackupFiles(): Map<String, ByteArray> = synchronized(lock) {
+        val candidates = linkedSetOf<String>()
+        fun addCandidate(relativePath: String) {
+            if (KbBackupPaths.isAllowed(relativePath)) {
+                candidates.add(relativePath)
+                return
+            }
+            val base = when {
+                relativePath.endsWith(".bak") -> relativePath.removeSuffix(".bak")
+                relativePath.endsWith(".new") -> relativePath.removeSuffix(".new")
+                else -> return
+            }
+            if (!KbBackupPaths.isAllowed(base)) return
+            val baseFile = File(root, base)
+            val backupFile = File(baseFile.absolutePath + ".bak")
+            // A lone .new is an interrupted first write, not committed data.
+            if (baseFile.exists() || backupFile.exists()) candidates.add(base)
+        }
+
+        val rootEntries = root.listFiles()
+        if (rootEntries == null) {
+            if (root.exists()) throw java.io.IOException("无法读取知识库目录")
+            return@synchronized emptyMap()
+        }
+        rootEntries.forEach { child ->
+            when {
+                child.isFile -> addCandidate(child.name)
+                child.isDirectory && child.name in setOf("logs", "relations") -> {
+                    val nested = child.listFiles() ?: throw java.io.IOException("无法读取知识库子目录")
+                    nested.filter { it.isFile }.forEach { file ->
+                        addCandidate("${child.name}/${file.name}")
+                    }
+                }
+            }
+        }
+
+        val result = linkedMapOf<String, ByteArray>()
+        var totalBytes = 0L
+        candidates.sorted().forEach { path ->
+            val file = File(root, path)
+            val bytes = if (KbBackupPaths.isQuarantined(path)) {
+                file.inputStream().use { readBounded(it, KbBackupPaths.MAX_FILE_BYTES) }
+            } else {
+                AtomicFile(file).openRead().use { readBounded(it, KbBackupPaths.MAX_FILE_BYTES) }
+            }
+            totalBytes += bytes.size
+            if (totalBytes > KbBackupPaths.MAX_TOTAL_BYTES) {
+                throw java.io.IOException("知识库数据超过单份备份上限（32 MiB）")
+            }
+            if (!KbBackupPaths.isQuarantined(path)) {
+                try {
+                    JSONArray(String(bytes, Charsets.UTF_8))
+                } catch (_: Exception) {
+                    throw java.io.IOException("知识库文件无法校验：${path.substringAfterLast('/')}")
+                }
+            }
+            result[path] = bytes
+        }
+        if (result.size > KbBackupPaths.MAX_FILE_COUNT) {
+            throw java.io.IOException("知识库文件数量超过备份上限")
+        }
+        result
+    }
+
+    /** Validate a snapshot before replacing the live knowledge base. */
+    internal fun restoreBackupFiles(files: Map<String, ByteArray>) = synchronized(lock) {
+        validateBackupFiles(files)
+
+        val stage = File(app.filesDir, "kb.restore.new")
+        val previous = File(app.filesDir, "kb.restore.old")
+        if (!deleteTreeChecked(stage) || !deleteTreeChecked(previous)) {
+            throw java.io.IOException("无法清理上次未完成的知识库恢复")
+        }
+        if (!stage.mkdirs() && !stage.isDirectory) {
+            throw java.io.IOException("无法创建知识库恢复暂存目录")
+        }
+
+        try {
+            files.forEach { (relativePath, bytes) ->
+                val target = File(stage, relativePath)
+                val parent = target.parentFile
+                if (parent != null && !parent.exists() && !parent.mkdirs()) {
+                    throw java.io.IOException("无法创建知识库子目录")
+                }
+                FileOutputStream(target).use { out ->
+                    out.write(bytes)
+                    out.fd.sync()
+                }
+            }
+        } catch (e: Exception) {
+            deleteTreeChecked(stage)
+            throw e
+        }
+
+        var movedCurrent = false
+        try {
+            if (root.exists()) {
+                if (!root.renameTo(previous)) throw java.io.IOException("无法暂存当前知识库")
+                movedCurrent = true
+            }
+            if (!stage.renameTo(root)) throw java.io.IOException("无法启用备份知识库")
+        } catch (e: Exception) {
+            if (movedCurrent && !root.exists() && previous.exists()) previous.renameTo(root)
+            deleteTreeChecked(stage)
+            throw e
+        }
+
+        clearCaches()
+        unreadable.clear()
+        if (!deleteTreeChecked(previous)) {
+            Log.w(TAG, "restored knowledge base; previous directory cleanup deferred")
+        }
+    }
+
+    private fun validateBackupFiles(files: Map<String, ByteArray>) {
+        if (files.size > KbBackupPaths.MAX_FILE_COUNT) {
+            throw java.io.IOException("备份文件数量超过限制")
+        }
+        var totalBytes = 0L
+        files.forEach { (path, bytes) ->
+            if (!KbBackupPaths.isAllowed(path)) throw java.io.IOException("备份包含不允许的文件路径")
+            if (bytes.size.toLong() > KbBackupPaths.MAX_FILE_BYTES) {
+                throw java.io.IOException("备份中的单个文件超过限制")
+            }
+            totalBytes += bytes.size
+            if (totalBytes > KbBackupPaths.MAX_TOTAL_BYTES) {
+                throw java.io.IOException("备份数据超过限制")
+            }
+            if (!KbBackupPaths.isQuarantined(path)) {
+                try {
+                    JSONArray(String(bytes, Charsets.UTF_8))
+                } catch (_: Exception) {
+                    throw java.io.IOException("备份中的知识库文件校验失败：${path.substringAfterLast('/')}")
+                }
+            }
+        }
+    }
+
+    private fun clearCaches() {
+        notesCache = null
+        contactsCache = null
+        graphCache = null
+        logCache.clear()
+        relationCache.clear()
+        lastScreenCache.clear()
+    }
+
+    private fun recoverRestoreDirectories() {
+        val stage = File(app.filesDir, "kb.restore.new")
+        val previous = File(app.filesDir, "kb.restore.old")
+        if (root.exists()) {
+            if (!deleteTreeChecked(previous)) Log.w(TAG, "could not remove old restore directory")
+            if (!deleteTreeChecked(stage)) Log.w(TAG, "could not remove incomplete restore staging")
+            return
+        }
+        if (previous.exists()) {
+            if (!previous.renameTo(root)) {
+                throw IllegalStateException("无法恢复上次知识库：旧数据目录仍在 ${previous.name}")
+            }
+            if (!deleteTreeChecked(stage)) Log.w(TAG, "could not remove incomplete restore staging")
+        } else if (!deleteTreeChecked(stage)) {
+            Log.w(TAG, "could not remove incomplete restore staging")
+        }
+    }
+
+    private fun deleteTreeChecked(file: File): Boolean =
+        !file.exists() || runCatching { file.deleteRecursively() }.getOrDefault(false) || !file.exists()
+
+    private fun readBounded(input: java.io.InputStream, maxBytes: Long): ByteArray {
+        val out = java.io.ByteArrayOutputStream()
+        val buffer = ByteArray(8192)
+        var total = 0L
+        while (true) {
+            val count = input.read(buffer)
+            if (count < 0) break
+            total += count
+            if (total > maxBytes) throw java.io.IOException("知识库文件超过大小限制")
+            out.write(buffer, 0, count)
+        }
+        return out.toByteArray()
     }
 
     // ------------------------------------------------------------------ io
@@ -892,13 +1097,42 @@ class KbStore private constructor(context: Context) {
     /** Files that failed to parse and could not be preserved; never overwrite. */
     private val unreadable = HashSet<String>()
 
+    init {
+        synchronized(lock) { recoverRestoreDirectories() }
+    }
+
     private fun readJsonArray(f: File): Loaded {
-        if (!f.exists()) { unreadable.remove(f.absolutePath); return Loaded(null, true) }
+        // Let AtomicFile.openRead restore its backup before deciding a missing
+        // base file represents an empty store.
+        val atomicBackup = File(f.absolutePath + ".bak")
+        val atomicNew = File(f.absolutePath + ".new")
+        if (!f.exists() && !atomicBackup.exists() && !atomicNew.exists()) {
+            unreadable.remove(f.absolutePath)
+            return Loaded(null, true)
+        }
         return try {
-            val arr = JSONArray(f.readText(Charsets.UTF_8))
+            // openRead performs AtomicFile recovery if a prior process died
+            // between startWrite and finishWrite.
+            val arr = AtomicFile(f).openRead().bufferedReader(Charsets.UTF_8).use {
+                JSONArray(it.readText())
+            }
             unreadable.remove(f.absolutePath)
             Loaded(arr, true)
         } catch (e: Exception) {
+            if (!f.exists() && !atomicBackup.exists()) {
+                // No committed base or backup exists. A lone .new is an
+                // interrupted first write, not a complete document.
+                val discarded = !atomicNew.exists() ||
+                    runCatching { atomicNew.delete() }.getOrDefault(false)
+                if (discarded) {
+                    unreadable.remove(f.absolutePath)
+                    Log.w(TAG, "discarded interrupted first write ${f.name}")
+                    return Loaded(null, true)
+                }
+                unreadable.add(f.absolutePath)
+                Log.w(TAG, "could not clean interrupted first write ${f.name}")
+                return Loaded(null, false)
+            }
             // Damaged file: set it aside under a dated name rather than let the
             // next save silently write over it. Starting empty is only safe once
             // the original is actually preserved.
@@ -910,35 +1144,42 @@ class KbStore private constructor(context: Context) {
         }
     }
 
-    /**
-     * Temp file + rename, so a crash never leaves a half-written document.
-     *
-     * The rename REPLACES the destination in one step (POSIX semantics, same
-     * directory) — deleting the old file first would mean a kill in between
-     * loses everything. Returns false when the data did not reach disk; callers
-     * drop their cache so the next read goes back to the file.
-     */
+    /** AtomicFile keeps the previous complete JSON if the write is interrupted. */
     private fun writeAtomic(f: File, text: String): Boolean {
         if (f.absolutePath in unreadable) {
             Log.w(TAG, "refusing to overwrite unparsable ${f.name}")
             return false
         }
-        val tmp = File(f.parentFile, f.name + ".tmp")
+        val atomic = AtomicFile(f)
+        var stream: FileOutputStream? = null
         return try {
-            f.parentFile?.mkdirs()
-            tmp.writeText(text, Charsets.UTF_8)
-            if (tmp.renameTo(f)) return true
-            // Same-directory rename should not fail. If it somehow does, an
-            // in-place overwrite is the only way left — not atomic, so say so.
-            Log.w(TAG, "rename failed, overwriting ${f.name} in place")
-            f.writeText(text, Charsets.UTF_8)
-            runCatching { tmp.delete() }
+            val parent = f.parentFile
+            if (parent != null && !parent.exists() && !parent.mkdirs()) {
+                throw java.io.IOException("could not create ${parent.name}")
+            }
+            val output = atomic.startWrite()
+            stream = output
+            output.write(text.toByteArray(Charsets.UTF_8))
+            atomic.finishWrite(output)
             true
         } catch (e: Exception) {
-            runCatching { tmp.delete() }
+            stream?.let { runCatching { atomic.failWrite(it) } }
             Log.w(TAG, "write failed ${f.name}: ${e.javaClass.simpleName}")
             false
         }
+    }
+
+    /** Remove AtomicFile sidecars and temporary files from the previous writer. */
+    private fun deleteAtomicFile(f: File): Boolean {
+        var ok = runCatching { AtomicFile(f).delete(); true }.getOrDefault(false)
+        listOf(".new", ".bak", ".tmp").forEach { suffix ->
+            val sidecar = File(f.absolutePath + suffix)
+            if (sidecar.exists() && !runCatching { sidecar.delete() }.getOrDefault(false)) {
+                ok = false
+            }
+        }
+        if (f.exists() && !runCatching { f.delete() }.getOrDefault(false)) ok = false
+        return ok
     }
 
     private fun intMap(o: JSONObject?): Map<String, Int> {

@@ -418,7 +418,10 @@ class KnowledgeActivity : AppCompatActivity() {
         c.setOnClickListener { editContactDialog(c0) }
         c.setOnLongClickListener {
             confirm("删除联系人", "删除「${c0.name}」及其全部历史、关系记录？不可恢复。") {
-                store.deleteContact(c0.id); render()
+                val deleted = store.deleteContact(c0.id)
+                render()
+                toast(if (deleted) "联系人及关联记录已删除" else
+                    "删除未完全成功；请检查存储空间后重试")
             }
             true
         }

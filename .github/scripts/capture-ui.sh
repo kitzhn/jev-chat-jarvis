@@ -167,11 +167,23 @@ def dump():
 
 for attempt in range(10):
     root = dump()
-    # The Google APIs emulator occasionally shows a setup-wizard ANR above
-    # Jev. Dismiss that system dialog before looking for app controls.
     nodes = list(root.iter("node"))
-    if any("googlesdksetup isn't responding" in n.attrib.get("text", "") for n in nodes):
-        close = next((n for n in nodes if n.attrib.get("text") == "Close app"), None)
+    # Cold boots can leave a known Android system app ANR above Jev. Dismiss
+    # launcher/setup-wizard ANRs, while preserving any dialog from the app.
+    anr_titles = [
+        n.attrib.get("text", "").strip().lower()
+        for n in nodes
+        if "isn't responding" in n.attrib.get("text", "").lower()
+    ]
+    known_system_anr = any(
+        "googlesdksetup" in title or "pixel launcher" in title
+        for title in anr_titles
+    )
+    if known_system_anr:
+        close = next(
+            (n for n in nodes if n.attrib.get("text", "").strip() in ("Close app", "关闭应用")),
+            None
+        )
         if close:
             m = re.match(r"\[(\d+),(\d+)\]\[(\d+),(\d+)\]", close.attrib.get("bounds", ""))
             if m:
@@ -342,6 +354,81 @@ python3 /tmp/ui_text.py wait "API 用量记录读取失败"
 test "$(adb shell "run-as $PKG cat files/usage/api_usage.json" | tr -d '\r')" = 'invalid-json'
 adb shell "run-as $PKG mv files/usage/api_usage.saved files/usage/api_usage.json"
 printf '%s\n' 'PASS: corrupt usage ledger preserved and dashboard reports failure' > integration-results/api-usage-corruption.txt
+
+# Exercise the production Android Keystore backup flow on API 35: create,
+# restore authenticated data, keep the shared key while one backup remains,
+# remove all backups and the key, then create again with a fresh key.
+mark_stage "10b-local-encrypted-backups"
+adb shell am start -W -n "$PKG/com.jev.probe.SettingsActivity" >/dev/null
+python3 /tmp/ui_text.py exact "本地加密备份与删除"
+python3 /tmp/ui_text.py wait "立即创建备份"
+python3 /tmp/ui_text.py exact "立即创建备份"
+python3 /tmp/ui_text.py wait "备份已创建："
+python3 /tmp/ui_text.py wait "恢复"
+adb exec-out screencap -p > screenshots/10b-local-encrypted-backups.png
+
+# A backup must restore KB data after the live contacts file is changed.
+printf '[]' > /tmp/empty-contacts.json
+adb push /tmp/empty-contacts.json /data/local/tmp/empty-contacts.json >/dev/null
+adb shell "run-as $PKG cp /data/local/tmp/empty-contacts.json files/kb/contacts.json"
+python3 /tmp/ui_text.py exact "恢复"
+python3 /tmp/ui_text.py wait "恢复这份备份？"
+python3 /tmp/ui_text.py exact "直接恢复"
+python3 /tmp/ui_text.py wait "已恢复"
+adb shell "run-as $PKG cat files/kb/contacts.json" > integration-results/backup-restored-contacts.json
+python3 - <<'PY'
+import json
+contacts = json.load(open("integration-results/backup-restored-contacts.json", encoding="utf-8"))
+assert any(contact.get("id") == "demo-a" for contact in contacts), contacts
+print("PASS: encrypted backup restored contacts through Android Keystore")
+PY
+adb shell "run-as $PKG test -s files/kb/contact_relations.json"
+adb shell "run-as $PKG test -s files/kb/logs/demo-a.json"
+
+backup_count() {
+  adb shell "run-as $PKG sh -c 'find files/local-backups -maxdepth 1 -type f -name \"*.jevbackup\" | wc -l'" | tr -d '\r '
+}
+
+# Two backups share one key. Deleting one must keep the remaining backup usable.
+python3 /tmp/ui_text.py exact "立即创建备份"
+python3 /tmp/ui_text.py wait "备份已创建："
+test "$(backup_count)" = "2"
+python3 /tmp/ui_text.py exact "删除"
+python3 /tmp/ui_text.py wait "删除这份备份？"
+python3 /tmp/ui_text.py exact "删除"
+python3 /tmp/ui_text.py wait "已删除这份备份"
+test "$(backup_count)" = "1"
+
+# Restore the remaining backup after the first deletion to prove its key remains.
+adb shell "run-as $PKG cp /data/local/tmp/empty-contacts.json files/kb/contacts.json"
+python3 /tmp/ui_text.py exact "恢复"
+python3 /tmp/ui_text.py wait "恢复这份备份？"
+python3 /tmp/ui_text.py exact "直接恢复"
+python3 /tmp/ui_text.py wait "已恢复"
+adb shell "run-as $PKG cat files/kb/contacts.json" > integration-results/backup-restored-after-single-delete.json
+python3 - <<'PY'
+import json
+contacts = json.load(open("integration-results/backup-restored-after-single-delete.json", encoding="utf-8"))
+assert any(contact.get("id") == "demo-a" for contact in contacts), contacts
+print("PASS: remaining encrypted backup stayed restorable after deleting its sibling")
+PY
+
+python3 /tmp/ui_text.py contains "删除全部备份（1）"
+python3 /tmp/ui_text.py wait "删除全部备份？"
+python3 /tmp/ui_text.py exact "全部删除"
+python3 /tmp/ui_text.py wait "已删除全部备份，并已清除本机解密密钥"
+test "$(backup_count)" = "0"
+
+# A later backup must work after the old Android Keystore key was removed.
+python3 /tmp/ui_text.py exact "立即创建备份"
+python3 /tmp/ui_text.py wait "备份已创建："
+test "$(backup_count)" = "1"
+python3 /tmp/ui_text.py contains "删除全部备份（1）"
+python3 /tmp/ui_text.py wait "删除全部备份？"
+python3 /tmp/ui_text.py exact "全部删除"
+python3 /tmp/ui_text.py wait "已删除全部备份，并已清除本机解密密钥"
+test "$(backup_count)" = "0"
+printf '%s\n' 'PASS: Android Keystore backup create, restore, single-delete, delete-all and key recreation' > integration-results/local-encrypted-backups.txt
 
 # ---------------------------------------------------------------------------
 mark_stage "11-cross-app-install"
