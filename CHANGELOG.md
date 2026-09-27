@@ -1,15 +1,12 @@
-# v2.5.1 — 2026-09-27
-
-- API 用量账本改用原子写入；读取损坏时保留原文件并提示，不再将其当成空账本。
-- 模型请求成功后，本地计量失败不会抹掉已收到的回复。
-- 禁止 API HTTP 重定向，避免凭据和聊天内容被转发；用量记录只存接口主机，移除可能含密钥的路径。
-- 发布任务不再覆盖已有 Release 的 APK。
-
 # 更新日志
 
 格式：每版按 新增 / 改进 / 修复 / 已知限制 / 下载 归类，人话版，不是提交列表。
 
-## 未发布
+## v2.5.2 Ultimate — 2026-09-27
+
+**下载**
+- [下载正式版 APK（ARM64）](https://github.com/kitzhn/jev-chat-jarvis/releases/download/v2.5.2/jev-ultimate-arm64.apk) · [SHA-256 校验文件](https://github.com/kitzhn/jev-chat-jarvis/releases/download/v2.5.2/jev-ultimate-arm64.apk.sha256) · [GitHub Release](https://github.com/kitzhn/jev-chat-jarvis/releases/tag/v2.5.2)。
+- 稳定更新入口：[latest APK](https://github.com/kitzhn/jev-chat-jarvis/releases/latest/download/jev-ultimate-arm64.apk) · [latest SHA-256](https://github.com/kitzhn/jev-chat-jarvis/releases/latest/download/jev-ultimate-arm64.apk.sha256)。
 
 **新增**
 - 设置页增加本地加密备份管理：可创建多份知识库备份、查看时间和大小、逐份恢复/删除，或一键删除全部备份。
@@ -25,6 +22,13 @@
 - 知识库 JSON 读写改用 `AtomicFile`，避免非原子回退覆盖原文件。
 - 备份恢复先校验 AES-GCM 认证标签、ZIP 清单、路径、大小和 JSON，再通过暂存目录切换知识库；中断时保留或恢复原数据。
 - 多输入框界面优先选择聊天编辑框；无法唯一定位时停止自动填入。
+
+## v2.5.1 Ultimate — 2026-09-27
+
+- API 用量账本改用原子写入；读取损坏时保留原文件并提示，不再将其当成空账本。
+- 模型请求成功后，本地计量失败不会抹掉已收到的回复。
+- 禁止 API HTTP 重定向，避免凭据和聊天内容被转发；用量记录只存接口主机，移除可能含密钥的路径。
+- 发布任务不再覆盖已有 Release 的 APK。
 
 ## v2.5.0 Ultimate — 2026-09-25
 
