@@ -658,7 +658,7 @@ Ultimate Debug 版本名：
 
 如果要长期发给朋友并且以后希望“直接覆盖升级、不丢本地数据”，请使用固定 Release 签名。
 
-仓库已经提供发布工作流，可通过推送与 App `versionName` 一致的 `v*` 标签自动发布，也可在 Actions 中手动运行：
+仓库已经提供发布工作流：推送与 App `versionName` 一致的 `v*` 标签会自动发布；也可在 Actions 从 `main` 手动运行，工作流会先校验并创建匹配版本的标签，再从该标签启动签名发布，并继续执行 `release` 环境审批。
 
 **Actions → Build Signed Ultimate Release**
 
