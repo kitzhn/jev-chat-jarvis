@@ -1,13 +1,42 @@
 package com.jev.probe.core
 
+import java.text.Normalizer
+import java.util.Locale
+
 /** Conversation allowlist policy shared by capture, OCR, and the reply-fill guard. */
 internal object ConversationWhitelistGate {
     fun allows(title: String?, entries: Set<String>): Boolean {
-        val normalizedTitle = title?.trim().orEmpty()
+        val normalizedTitle = normalize(title.orEmpty())
         if (normalizedTitle.isEmpty()) return false
-        val keywords = entries.asSequence().map(String::trim).filter(String::isNotEmpty)
-        return keywords.any { normalizedTitle.contains(it, ignoreCase = true) }
+        return entries.asSequence()
+            .map(::normalize)
+            .filter { it.isNotEmpty() && it.replace("*", "").isNotEmpty() }
+            .any { entry ->
+                if ('*' !in entry) normalizedTitle == entry
+                else {
+                    val pattern = buildString {
+                        var segmentStart = 0
+                        entry.forEachIndexed { index, char ->
+                            if (char == '*') {
+                                append(Regex.escape(entry.substring(segmentStart, index)))
+                                append(".*")
+                                segmentStart = index + 1
+                            }
+                        }
+                        append(Regex.escape(entry.substring(segmentStart)))
+                    }
+                    Regex("^$pattern$", RegexOption.IGNORE_CASE).matches(normalizedTitle)
+                }
+            }
     }
+
+    /** Ignore presentation-only group member counts while requiring the full title. */
+    private fun normalize(value: String): String = Normalizer
+        .normalize(value.trim(), Normalizer.Form.NFKC)
+        .replace(Regex("\\s+"), " ")
+        .replace(Regex("\\s*\\(\\s*\\d+\\s*\\)\\s*$"), "")
+        .trim()
+        .lowercase(Locale.ROOT)
 }
 
 /** The chat identity captured when the owner taps a reply candidate. */

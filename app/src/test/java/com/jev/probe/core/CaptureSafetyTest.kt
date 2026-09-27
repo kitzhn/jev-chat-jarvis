@@ -14,10 +14,24 @@ class CaptureSafetyTest {
     }
 
     @Test
-    fun matchingKeywordAllowsOnlyTheNamedConversation() {
-        assertTrue(ConversationWhitelistGate.allows("演示旅行群（3）", setOf("旅行群")))
-        assertTrue(ConversationWhitelistGate.allows("Dev Team", setOf("dev")))
+    fun fullTitleMatchesAfterRemovingGroupCountSuffix() {
+        assertTrue(ConversationWhitelistGate.allows("演示旅行群（3）", setOf("演示旅行群")))
+        assertTrue(ConversationWhitelistGate.allows("DEV TEAM", setOf("dev team")))
+        assertTrue(ConversationWhitelistGate.allows("家庭群 ( 3 )", setOf("家庭群")))
+    }
+
+    @Test
+    fun partialTitleDoesNotAuthorizeAnotherConversation() {
+        assertFalse(ConversationWhitelistGate.allows("演示旅行群", setOf("旅行群")))
+        assertFalse(ConversationWhitelistGate.allows("家庭群工作讨论", setOf("家庭群")))
         assertFalse(ConversationWhitelistGate.allows("家庭群", setOf("旅行群")))
+    }
+
+    @Test
+    fun broadMatchingRequiresAnExplicitWildcard() {
+        assertTrue(ConversationWhitelistGate.allows("家庭群工作讨论", setOf("家庭群*")))
+        assertFalse(ConversationWhitelistGate.allows("家庭群工作讨论", setOf("家庭群")))
+        assertFalse(ConversationWhitelistGate.allows("家庭群", setOf("*")))
     }
 
     @Test

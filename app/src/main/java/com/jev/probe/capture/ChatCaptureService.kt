@@ -1,10 +1,15 @@
 package com.jev.probe.capture
 
 import android.accessibilityservice.AccessibilityService
+import android.content.ClipData
+import android.content.ClipDescription
+import android.content.ClipboardManager
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.Rect
+import android.os.Build
 import android.os.Bundle
+import android.os.PersistableBundle
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
@@ -20,9 +25,12 @@ import com.jev.probe.capture.ocr.ScreenCapture
 import com.jev.probe.core.BubbleRect
 import com.jev.probe.core.CaptureTarget
 import com.jev.probe.core.CaptureTargetGate
+import com.jev.probe.core.ChatInputTargetSelector
 import com.jev.probe.core.ChatSnapshot
+import com.jev.probe.core.EditableCandidate
 import com.jev.probe.core.Msg
 import com.jev.probe.core.Prefs
+import com.jev.probe.core.ReplyClipboardPolicy
 import com.jev.probe.core.kb.ContextBuilder
 import com.jev.probe.core.kb.KbStore
 import com.jev.probe.jev.JevClient
@@ -821,6 +829,7 @@ open class ChatCaptureService : AccessibilityService() {
         submit {
             if (delayBeforeCheckMs > 0L) Thread.sleep(delayBeforeCheckMs.coerceAtMost(5_000L))
             var stale = !captureTargetIsCurrent(expectedTarget)
+            var clipboardPreparedForPaste = false
             // Fast path: SET_TEXT works when the box already has input focus and no
             // IME composing session is active.
             var ok = if (stale) false else trySetText(text, expectedTarget)
@@ -834,7 +843,7 @@ open class ChatCaptureService : AccessibilityService() {
                 if (!targetMatchesRoot(expectedTarget, root)) {
                     stale = true
                 } else {
-                    val edit = root?.let { findEditable(it) }
+                    val edit = root?.let { findEditable(it, expectedTarget.packageName) }
                     if (edit != null) {
                         if (!targetMatchesRoot(expectedTarget, root)) {
                             stale = true
@@ -852,9 +861,12 @@ open class ChatCaptureService : AccessibilityService() {
                                     if (!targetMatchesRoot(expectedTarget, focusedRoot)) {
                                         stale = true
                                     } else {
-                                        val focused = focusedRoot?.let { findEditable(it) }
+                                        val focused = focusedRoot?.let {
+                                            findEditable(it, expectedTarget.packageName)
+                                        }
                                         if (focused != null) {
                                             copyToClipboard(text)
+                                            clipboardPreparedForPaste = true
                                             if (!captureTargetIsCurrent(expectedTarget)) {
                                                 stale = true
                                             } else {
@@ -866,7 +878,9 @@ open class ChatCaptureService : AccessibilityService() {
                                                     if (!targetMatchesRoot(expectedTarget, pasteRoot)) {
                                                         stale = true
                                                     } else {
-                                                        val pasteNode = pasteRoot?.let { findEditable(it) }
+                                                        val pasteNode = pasteRoot?.let {
+                                                            findEditable(it, expectedTarget.packageName)
+                                                        }
                                                         if (pasteNode != null) {
                                                             val pasted = pasteNode.performAction(
                                                                 AccessibilityNodeInfo.ACTION_PASTE
@@ -875,9 +889,13 @@ open class ChatCaptureService : AccessibilityService() {
                                                             if (!captureTargetIsCurrent(expectedTarget)) {
                                                                 stale = true
                                                             } else {
-                                                                val after = readInput()
+                                                                val after = readInput(expectedTarget.packageName)
                                                                 ok = (after != null && after.contains(text)) ||
                                                                     (pasted && after == null)
+                                                                if (ok) {
+                                                                    clearReplyClipboardIfOwned(text)
+                                                                    clipboardPreparedForPaste = false
+                                                                }
                                                                 Log.i(TAG, "fill: paste=$pasted readback=" +
                                                                     (after?.length ?: -1))
                                                             }
@@ -894,16 +912,27 @@ open class ChatCaptureService : AccessibilityService() {
                 }
             }
             if (stale) {
+                if (clipboardPreparedForPaste) clearReplyClipboardIfOwned(text)
                 reportStaleFill()
             } else {
                 main.post {
                     if (!captureTargetIsCurrent(expectedTarget)) {
+                        if (clipboardPreparedForPaste) clearReplyClipboardIfOwned(text)
                         reportStaleFill()
                     } else if (ok) {
                         overlay?.toast("已填入，确认后自己发送")
                     } else {
-                        copyToClipboard(text)
-                        overlay?.toast("已复制，长按输入框粘贴")
+                        if (clipboardPreparedForPaste && !replyClipboardStillOwned(text)) {
+                            overlay?.toast("剪贴板已变化，未覆盖；请重新点选候选回复")
+                        } else {
+                            if (!clipboardPreparedForPaste) copyToClipboard(text)
+                            if (!captureTargetIsCurrent(expectedTarget)) {
+                                clearReplyClipboardIfOwned(text)
+                                reportStaleFill()
+                            } else {
+                                overlay?.toast("已复制，长按输入框粘贴")
+                            }
+                        }
                     }
                 }
             }
@@ -914,7 +943,7 @@ open class ChatCaptureService : AccessibilityService() {
     private fun trySetText(text: String, expectedTarget: CaptureTarget): Boolean {
         val root = rootInActiveWindow ?: return false
         if (!targetMatchesRoot(expectedTarget, root)) return false
-        val edit = findEditable(root) ?: return false
+        val edit = findEditable(root, expectedTarget.packageName) ?: return false
         if (!targetMatchesRoot(expectedTarget, root)) return false
         if (!setTextRaw(edit, text)) return false
         // SET_TEXT can report success without filling an unfocused box; verify.
@@ -923,7 +952,7 @@ open class ChatCaptureService : AccessibilityService() {
         // failure and triggered a second PASTE on top.
         Thread.sleep(150)
         if (!captureTargetIsCurrent(expectedTarget)) return false
-        val after = readInput()
+        val after = readInput(expectedTarget.packageName)
         Log.i(TAG, "fill: setText readback=" + (after?.length ?: -1) + " want=" + text.length)
         return after == text
     }
@@ -936,28 +965,79 @@ open class ChatCaptureService : AccessibilityService() {
     }
 
     /** Current text of the input box, fetched fresh (bypassing the node cache). */
-    private fun readInput(): String? {
-        val edit = rootInActiveWindow?.let { findEditable(it) } ?: return null
+    private fun readInput(packageName: String): String? {
+        val edit = rootInActiveWindow?.let { findEditable(it, packageName) } ?: return null
         runCatching { edit.refresh() }
         return edit.text?.toString()
     }
 
-    private fun findEditable(root: AccessibilityNodeInfo): AccessibilityNodeInfo? {
+    private fun findEditable(root: AccessibilityNodeInfo, packageName: String): AccessibilityNodeInfo? {
         val stack = ArrayDeque<AccessibilityNodeInfo>()
         stack.addLast(root)
+        val nodes = ArrayList<AccessibilityNodeInfo>()
         var guard = 0
         while (stack.isNotEmpty() && guard < 5000) {
             guard++
             val node = stack.removeLast()
-            if (node.isEditable) return node
+            if (node.isEditable || node.className?.toString() == "android.widget.EditText") {
+                nodes.add(node)
+            }
             for (i in node.childCount - 1 downTo 0) node.getChild(i)?.let { stack.addLast(it) }
         }
-        return null
+        val rootBounds = Rect()
+        root.getBoundsInScreen(rootBounds)
+        val rootHeight = rootBounds.height()
+        val candidates = nodes.mapIndexed { index, node ->
+            val bounds = Rect()
+            node.getBoundsInScreen(bounds)
+            val center = if (rootHeight > 0 && bounds.height() > 0) {
+                (bounds.exactCenterY() - rootBounds.top) / rootHeight.toFloat()
+            } else null
+            EditableCandidate(
+                index = index,
+                viewId = node.viewIdResourceName.orEmpty(),
+                hint = node.hintText?.toString().orEmpty(),
+                contentDescription = node.contentDescription?.toString().orEmpty(),
+                className = node.className?.toString().orEmpty(),
+                editable = node.isEditable,
+                focused = node.isFocused,
+                verticalCenter = center
+            )
+        }
+        val selected = ChatInputTargetSelector.select(packageName, candidates) ?: return null
+        return nodes.getOrNull(selected)
     }
 
     private fun copyToClipboard(text: String) {
-        val cm = getSystemService(CLIPBOARD_SERVICE) as android.content.ClipboardManager
-        cm.setPrimaryClip(android.content.ClipData.newPlainText("jev_reply", text))
+        val cm = getSystemService(CLIPBOARD_SERVICE) as ClipboardManager
+        val clip = ClipData.newPlainText(ReplyClipboardPolicy.LABEL, text)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            clip.description.extras = PersistableBundle().apply {
+                putBoolean(ClipDescription.EXTRA_IS_SENSITIVE, true)
+            }
+        }
+        cm.setPrimaryClip(clip)
+    }
+
+    private fun replyClipboardStillOwned(text: String): Boolean {
+        val cm = getSystemService(CLIPBOARD_SERVICE) as ClipboardManager
+        val description = cm.primaryClipDescription ?: return false
+        val clip = cm.primaryClip ?: return false
+        return clip.itemCount == 1 && ReplyClipboardPolicy.owns(
+            description.label, clip.getItemAt(0).text?.toString(), text
+        )
+    }
+
+    /** Clear only our own clip; never erase something the user copied afterward. */
+    private fun clearReplyClipboardIfOwned(text: String) {
+        val cm = getSystemService(CLIPBOARD_SERVICE) as ClipboardManager
+        val description = cm.primaryClipDescription ?: return
+        val clip = cm.primaryClip ?: return
+        if (clip.itemCount != 1 || !ReplyClipboardPolicy.owns(
+                description.label, clip.getItemAt(0).text?.toString(), text
+            )
+        ) return
+        cm.clearPrimaryClip()
     }
 
     override fun onInterrupt() {}
@@ -994,7 +1074,6 @@ open class ChatCaptureService : AccessibilityService() {
         }
 
         private const val TAG = "JEVASSIST"
-
         private const val PKG_WECHAT = "com.tencent.mm"
         private const val WECHAT_DEBOUNCE_MS = 900L
         private const val WECHAT_MIN_INTERVAL_MS = 4000L

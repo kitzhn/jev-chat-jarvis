@@ -2,9 +2,9 @@
 
 **Jev 聊天助手在你的设备上读取你正在看的聊天，把内容发给你自己配置的模型接口做判断和起草回复。作者不运营服务器，收不到你的任何数据。**
 
-版本 v1.0，生效日期 2026-09-23。适用范围：Android 端 [jev-chat-jarvis](https://github.com/jev-chat/jev-chat-jarvis)。Windows 版（[jev-chat-windows](https://github.com/jev-chat/jev-chat-windows)）与 macOS 版（[jev-chat-jarvis-mac](https://github.com/jev-chat/jev-chat-jarvis-mac)）是各自独立的仓库和安装包，不在本政策范围内，请分别查看它们自己的说明。
+版本 v1.1，生效日期 2026-09-27。适用范围：Android 端 [jev-chat-jarvis](https://github.com/jev-chat/jev-chat-jarvis)。Windows 版（[jev-chat-windows](https://github.com/jev-chat/jev-chat-windows)）与 macOS 版（[jev-chat-jarvis-mac](https://github.com/jev-chat/jev-chat-jarvis-mac)）是各自独立的仓库和安装包，不在本政策范围内，请分别查看它们自己的说明。
 
-如果你更习惯先看结论：本项目**不是**"零数据收集"产品——它确实会把你正在看的聊天文字发给一个第三方模型接口，但那个接口地址是你自己在设置里填的，不是作者的服务器。除此之外的数据只留在你手机里，删应用或点一键清空都能删干净。下面逐项说清楚"发了什么、发给谁、什么时候发、存在哪、怎么删"。
+如果你更习惯先看结论：本项目**不是**"零数据收集"产品——它确实会把你正在看的聊天文字发给一个第三方模型接口，但那个接口地址是你自己在设置里填的，不是作者的服务器。其它数据只留在你手机里；知识库和加密备份有各自的删除入口，卸载或清除应用数据会删除全部本地数据。下面逐项说清楚"发了什么、发给谁、什么时候发、存在哪、怎么删"。
 
 ---
 
@@ -50,10 +50,13 @@ API 密钥会作为请求头（`Authorization`）随对应请求发给你自己�
 | 知识库笔记（标题、内容、标签） | 你手动建的背景资料，供判断时检索引用 | `filesDir/kb/notes.json` | 直到你删除 | 设置页「清空知识库与历史」，或逐条删除 |
 | 联系人档案（名称、别名、关系、备注） | 你手动建的联系人背景信息 | `filesDir/kb/contacts.json` | 直到你删除 | 同上 |
 | 聊天历史 | 供判断时参考该联系人过往对话（默认关闭） | `filesDir/kb/logs/<联系人>.json` | 每位联系人最多保留 300 条，开启后才开始记录 | 设置页关闭该开关不再新增，「清空知识库与历史」一键清空 |
+| 本地备份 | 在本机恢复指定版本的笔记、联系人、关系和聊天历史 | `filesDir/local-backups/*.jevbackup`，由 Android Keystore 中的 AES-GCM 密钥加密 | 直到你删除或卸载应用；仅当前设备、当前安装可恢复 | 设置页「本地加密备份与删除」可逐份删除或一键删除全部；删除最后一份时同时清理解密密钥 |
 
-设置页的「清空知识库与历史」会删除 `kb` 目录下的全部内容，不影响密钥与其它设置；卸载应用会连同上述所有数据一起删除，没有云端备份。
+设置页的「清空知识库与历史」会删除 `kb` 目录下的内容，不影响密钥、其它设置或已创建的备份。备份单独加密保存，清空知识库后仍需在「本地加密备份与删除」中删除；逐份删除或一键删除全部都可用，删除全部时应用会主动清理解密密钥。卸载或清除应用数据会删除知识库与备份文件；备份不上传、不提供跨设备迁移。
 
 日志（logcat）只输出消息条数、字符长度、异常类名这类调试信息，**不输出聊天正文**。
+
+如果自动填入失败，应用会把候选回复复制到系统剪贴板供你手动粘贴。Android 13 及以上会将其标记为敏感内容，供系统隐藏预览；这个标记本身不限制其它应用读取剪贴板。自动粘贴成功或会话过期时，如果剪贴板仍是本应用写入的内容，会立即清除。选择“已复制，长按输入框粘贴”时会保留剪贴板内容，直到你替换、清除或系统自动清理它。
 
 ## 4. 权限与用途
 
@@ -78,10 +81,11 @@ API 密钥会作为请求头（`Authorization`）随对应请求发给你自己�
 
 - **关闭历史记录**：设置页里关掉「记录聊天历史」开关，之后不再新增；已有记录仍在本机，需手动清空。
 - **清空知识库与历史**：设置页「清空知识库与历史」一键删除 `kb` 目录全部内容。
+- **管理本地备份**：设置页「本地加密备份与删除」可创建多份加密备份、逐份恢复/删除，或一键删除全部备份；清空知识库不会自动删备份。
 - **更换或自建接口**：判断、回复、视觉三路接口地址、密钥、模型名都可以在设置页单独改成你信任的服务商，甚至自建的 OpenAI 兼容网关。
 - **只用手动分析**：关闭自动分析开关后，只有你主动点击才会触发一次判断/生成，不会在后台持续读取。
-- **会话白名单**：仅为筛选而在本机读取会话标题。只有标题匹配白名单后，才读取消息正文；白名单留空、标题未识别或不匹配时，不读取消息正文、不截图/OCR、不分析，也不会将该会话内容发送给模型服务。
-- **卸载即清空**：卸载应用会删除本机存储的全部数据（密钥、设置、知识库、历史），没有云端账号或备份需要额外注销。
+- **会话白名单**：仅为筛选而在本机读取会话标题。按完整标题匹配（忽略大小写和末尾群人数）；需扩大范围时可显式使用 `*`。只有标题匹配后才读取消息正文；白名单留空、标题未识别或不匹配时，不读取正文、不截图/OCR、不分析，也不会将该会话内容发送给模型服务。
+- **卸载即清空**：卸载应用会删除本机存储的密钥、设置、知识库与加密备份；本地备份不能在另一台设备或重装后的应用中恢复。删除全部备份时，应用会主动移除对应解密密钥。
 
 ## 7. 第三方模型服务商
 
@@ -109,10 +113,10 @@ Jev Chat Assistant (Android) reads the chat you are currently viewing on your de
 - **No servers are operated by the author.** The author cannot receive, store, or see your chat content — it never passes through any author-controlled infrastructure.
 - **Chat text goes only to your own configured model endpoint**, along with a relationship description you write, optionally matched knowledge-base notes/contact notes, and optionally recent history for that contact (default 30 messages, 0–100 adjustable, off by default).
 - **Screenshots are never uploaded.** When a chat app's accessibility tree lacks readable text (e.g. Feishu), the screen is captured and OCR'd entirely on-device; the image is processed in memory and discarded, never saved or sent anywhere.
-- **Local-only storage**: API keys, endpoint settings, knowledge-base notes/contacts, and (if enabled) per-contact chat history live only in the app's private storage on your device. Nothing syncs to the cloud. Uninstalling the app deletes all of it; a one-tap "clear knowledge base & history" option is also available.
+- **Local-only storage**: API keys, endpoint settings, knowledge-base notes/contacts, and (if enabled) per-contact chat history live only in the app's private storage on your device. Optional knowledge-base backups are encrypted with an Android Keystore AES-GCM key and remain usable only in this app installation on this device. The settings page can delete one backup or all backups; deleting all backups actively removes the key, while clearing the active knowledge base does not delete backup copies. Uninstalling or clearing app data removes the local files.
 - **No ads, no third-party analytics SDKs (no Google Analytics, Firebase, etc.), no cookies or advertising identifiers.**
 - The app never sends messages automatically — you always press send yourself — and it never touches money transfers, red packets, or payments.
 - The project is open source; every claim above can be verified against the source at https://github.com/jev-chat/jev-chat-jarvis.
 - Third-party model providers you choose to use are governed by their own privacy policies, which you should review separately.
 
-Version 1.0, effective 2026-09-23. Scope: Android app only.
+Version 1.1, effective 2026-09-27. Scope: Android app only.

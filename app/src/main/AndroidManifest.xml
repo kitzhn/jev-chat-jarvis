@@ -35,6 +35,10 @@
             android:name=".KnowledgeActivity"
             android:exported="false" />
 
+        <activity
+            android:name=".LocalBackupActivity"
+            android:exported="false" />
+
         <service
             android:name=".capture.ChatCaptureService"
             android:exported="true"

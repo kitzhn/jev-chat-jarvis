@@ -364,13 +364,14 @@ class SettingsActivity : AppCompatActivity() {
         card2.addView(label("关系描述（给 Jev 判断用）"))
         val relEdit = edit(prefs.relationship, Prefs.DEFAULT_REL)
         card2.addView(relEdit)
-        card2.addView(label("会话白名单（每行一个关键词，空=全部关闭）"))
+        card2.addView(label("会话白名单（完整标题，每行一项；空=全部关闭）"))
         val wlEdit = edit(prefs.whitelist.joinToString("\n"), "留空时不处理任何会话").apply {
             inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_MULTI_LINE; minLines = 2
         }
         card2.addView(wlEdit)
         card2.addView(text(
-            "只读取会话标题来匹配白名单。留空、标题未识别或不匹配时，不读取消息正文、不截图 OCR、不分析。",
+            "按完整标题匹配，忽略大小写及末尾群人数（如「家庭群（3）」）；需要扩大范围时可明确使用 * 通配符。" +
+                "旧版只填部分关键词的条目请改为完整标题。未匹配时不读取消息、不截图 OCR、不分析。",
             11f, sub))
         val autoRow = toggleRow("对方发消息时自动分析", prefs.autoAnalyze)
         card2.addView(autoRow)
@@ -433,13 +434,19 @@ class SettingsActivity : AppCompatActivity() {
         card2.addView(cardBtn("知识库与联系人") {
             startActivity(android.content.Intent(this, KnowledgeActivity::class.java))
         })
+        card2.addView(cardBtn("本地加密备份与删除") {
+            startActivity(android.content.Intent(this, LocalBackupActivity::class.java))
+        })
+        card2.addView(text(
+            "可创建多份备份、逐份删除或一键删除全部；备份只在本机此应用安装内可恢复。",
+            11f, sub))
         val kbResult = resultText()
         card2.addView(cardBtn("清空知识库与历史") {
             val c = KbStore.get(this).counts()
             androidx.appcompat.app.AlertDialog.Builder(this)
                 .setTitle("清空知识库与历史")
                 .setMessage("将删除 ${c.notes} 条笔记、${c.contacts} 个联系人、${c.relationEdges} 条关系边、${c.logLines} 条聊天历史。" +
-                    "密钥、白名单等设置不受影响。不可恢复。")
+                    "密钥、白名单等设置不受影响。已创建的备份也不会删除，可在“本地加密备份与删除”中管理。不可恢复。")
                 .setPositiveButton("清空") { _, _ ->
                     KbStore.get(this).clearAll()
                     kbResult.text = "已清空知识库与历史"
