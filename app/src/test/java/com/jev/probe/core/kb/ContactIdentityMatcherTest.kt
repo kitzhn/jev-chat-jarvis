@@ -71,4 +71,21 @@ class ContactIdentityMatcherTest {
             )?.id
         )
     }
+
+    @Test
+    fun modernIdentityDataCannotFallBackThroughLegacyApps() {
+        val contact = Contact(
+            id = "modern",
+            name = "张三",
+            apps = listOf("com.tencent.mobileqq", "com.twitter.android"),
+            identities = listOf(PlatformIdentity("com.tencent.mobileqq", "张三"))
+        )
+
+        assertNull(
+            ContactIdentityMatcher.findConversationContact(
+                listOf(contact), "张三", "com.twitter.android", ::norm
+            )
+        )
+    }
+
 }
