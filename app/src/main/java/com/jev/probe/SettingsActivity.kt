@@ -448,8 +448,9 @@ class SettingsActivity : AppCompatActivity() {
                 .setMessage("将删除 ${c.notes} 条笔记、${c.contacts} 个联系人、${c.relationEdges} 条关系边、${c.logLines} 条聊天历史。" +
                     "密钥、白名单等设置不受影响。已创建的备份也不会删除，可在“本地加密备份与删除”中管理。不可恢复。")
                 .setPositiveButton("清空") { _, _ ->
-                    KbStore.get(this).clearAll()
-                    kbResult.text = "已清空知识库与历史"
+                    val cleared = KbStore.get(this).clearAll()
+                    kbResult.text = if (cleared) "已清空知识库与历史"
+                    else "清空未完全成功；原数据可能仍有残留，请检查存储空间后重试"
                 }
                 .setNegativeButton("取消", null)
                 .show()
@@ -824,7 +825,7 @@ class SettingsActivity : AppCompatActivity() {
         private const val SCRATCH_REPLY = "jev_probe_scratch_reply"
         private const val SCRATCH_VISION = "jev_probe_scratch_vision"
 
-        private const val PRIVACY_URL = "https://chatjevs.com/privacy.html"
+        private const val PRIVACY_URL = "https://github.com/kitzhn/jev-chat-jarvis/blob/main/PRIVACY.md"
         private const val REPO_URL = "https://github.com/kitzhn/jev-chat-jarvis"
         private const val GUIDE_URL =
             "https://github.com/kitzhn/jev-chat-jarvis/blob/main/docs/USER_GUIDE_ZH.md"

@@ -315,7 +315,14 @@ class KbStore private constructor(context: Context) {
         null
     }
 
-    private fun mergeContacts(targetId: String, sourceId: String): Boolean {
+    private fun mergeContacts(targetId: String, sourceId: String): Boolean = synchronized(lock) {
+        if (targetId == sourceId) return@synchronized true
+        runKnowledgeTransaction("merge contacts") {
+            mergeContactsUnsafe(targetId, sourceId)
+        }
+    }
+
+    private fun mergeContactsUnsafe(targetId: String, sourceId: String): Boolean {
         if (targetId == sourceId) return true
         val list = loadContacts()
         val target = list.firstOrNull { it.id == targetId } ?: return false
@@ -392,13 +399,17 @@ class KbStore private constructor(context: Context) {
         logCache.remove(sourceId)
         relationCache.remove(sourceId)
         lastScreenCache.remove(sourceId)
-        listOf(logFile(sourceId), screenFile(sourceId), relationFile(sourceId)).forEach {
-            if (!deleteAtomicFile(it)) Log.w(TAG, "failed to delete merged source file ${it.name}")
+        val sourceFilesDeleted =
+            listOf(logFile(sourceId), screenFile(sourceId), relationFile(sourceId))
+                .all { deleteAtomicFile(it) }
+        if (!sourceFilesDeleted) {
+            Log.w(TAG, "merge contacts: source cleanup failed")
+            return false
         }
         return true
     }
 
-    /** Removes the contact only after both index files are safely updated. */
+    /** Remove one contact as a multi-file transaction. */
     fun deleteContact(id: String): Boolean = synchronized(lock) {
         val oldContacts = loadContacts().toList()
         if (oldContacts.none { it.id == id }) return@synchronized false
@@ -407,38 +418,11 @@ class KbStore private constructor(context: Context) {
         val oldEdges = loadContactRelations().toList()
         val newEdges = oldEdges.filterNot { it.fromId == id || it.toId == id }
 
-        val completed = ContactDeleteCommit.execute(
-            writeContacts = { writeAtomic(contactsFile, contactsJson(newContacts)) },
-            writeRelations = { writeAtomic(graphFile, contactRelationsJson(newEdges)) },
-            restoreContacts = {
-                writeAtomic(contactsFile, contactsJson(oldContacts)).also { restored ->
-                    if (!restored) Log.e(TAG, "failed to roll back contacts after relation-write failure")
-                }
-            },
-            deleteHistory = {
-                logCache.remove(id)
-                relationCache.remove(id)
-                lastScreenCache.remove(id)
-                var deleted = true
-                listOf(logFile(id), screenFile(id), relationFile(id)).forEach { file ->
-                    if (!deleteAtomicFile(file)) {
-                        deleted = false
-                        Log.w(TAG, "failed to delete ${file.name} after contact removal")
-                    }
-                }
-                deleted
-            }
-        )
-        // Reload persisted state after any failed stage (including a failed
-        // rollback); never leave caches claiming a partial commit was complete.
-        if (completed) {
-            contactsCache = newContacts.toMutableList()
-            graphCache = newEdges.toMutableList()
-        } else {
-            contactsCache = null
-            graphCache = null
+        runKnowledgeTransaction("delete contact") {
+            if (!writeAtomic(contactsFile, contactsJson(newContacts))) return@runKnowledgeTransaction false
+            if (!writeAtomic(graphFile, contactRelationsJson(newEdges))) return@runKnowledgeTransaction false
+            listOf(logFile(id), screenFile(id), relationFile(id)).all { deleteAtomicFile(it) }
         }
-        completed
     }
 
     /**
@@ -449,25 +433,13 @@ class KbStore private constructor(context: Context) {
      * @param app package name of the chat app the title came from; used only to
      *        prefer a contact that already knows this app when two match.
      */
-    fun findContact(title: String, app: String): Contact? {
-        synchronized(lock) {
-            val want = normalizeName(title)
-            if (want.isEmpty()) return null
-            if (app.isNotBlank()) {
-                loadContacts().firstOrNull { c ->
-                    c.identities.any { identity ->
-                        identity.app == app &&
-                            identity.scope.isBlank() &&
-                            normalizeName(identity.title) == want
-                    }
-                }?.let { return it }
-            }
-            val hits = loadContacts().filter { c ->
-                normalizeName(c.name) == want || c.aliases.any { normalizeName(it) == want }
-            }
-            if (hits.isEmpty()) return null
-            return hits.firstOrNull { app.isNotBlank() && it.apps.contains(app) } ?: hits.first()
-        }
+    fun findContact(title: String, app: String): Contact? = synchronized(lock) {
+        ContactIdentityMatcher.findConversationContact(
+            contacts = loadContacts(),
+            title = title,
+            app = app,
+            normalize = ::normalizeName
+        )
     }
 
     /**
@@ -608,12 +580,12 @@ class KbStore private constructor(context: Context) {
         return ok
     }
 
-    fun clearLog(contactId: String) = synchronized(lock) {
+    fun clearLog(contactId: String): Boolean = synchronized(lock) {
         logCache.remove(contactId)
         lastScreenCache.remove(contactId)
-        runCatching { logFile(contactId).delete() }
-        runCatching { screenFile(contactId).delete() }
-        Unit
+        val logDeleted = deleteAtomicFile(logFile(contactId))
+        val screenDeleted = deleteAtomicFile(screenFile(contactId))
+        logDeleted && screenDeleted
     }
 
     /**
@@ -655,16 +627,18 @@ class KbStore private constructor(context: Context) {
      * Wipe every knowledge-base file. Deletes only `filesDir/kb` — API keys,
      * whitelist and every other SharedPreferences value are untouched.
      */
-    fun clearAll() = synchronized(lock) {
-        notesCache = null
-        contactsCache = null
-        graphCache = null
-        logCache.clear()
-        relationCache.clear()
-        lastScreenCache.clear()
-        runCatching { root.deleteRecursively() }
-        Log.i(TAG, "kb cleared")
-        Unit
+    fun clearAll(): Boolean = synchronized(lock) {
+        clearCaches()
+        val cleared = deleteTreeChecked(root)
+        if (cleared) {
+            unreadable.clear()
+            Log.i(TAG, "kb cleared")
+        } else {
+            // Preserve fail-closed protection for any unreadable file that
+            // survived a partial filesystem deletion.
+            Log.w(TAG, "kb clear incomplete")
+        }
+        cleared
     }
 
     /** Snapshot committed knowledge-base files under the store lock. */
@@ -730,6 +704,36 @@ class KbStore private constructor(context: Context) {
             throw java.io.IOException("知识库文件数量超过备份上限")
         }
         result
+    }
+
+    /**
+     * Execute a rare multi-file knowledge-base mutation with a full committed
+     * snapshot as the rollback point. Single-file AtomicFile writes prevent
+     * torn JSON; this wrapper adds all-or-nothing semantics across contacts,
+     * graph, history and relationship-event files.
+     */
+    private fun runKnowledgeTransaction(label: String, block: () -> Boolean): Boolean {
+        val outcome = KnowledgeMutationTransaction.execute(
+            snapshot = { exportBackupFiles() },
+            mutate = block,
+            rollback = { before ->
+                runCatching {
+                    restoreBackupFiles(before)
+                    true
+                }.getOrDefault(false)
+            }
+        )
+        clearCaches()
+        when {
+            outcome.committed -> Unit
+            !outcome.snapshotSucceeded ->
+                Log.w(TAG, "$label: could not snapshot current knowledge base")
+            !outcome.rollbackSucceeded ->
+                Log.e(TAG, "$label rollback failed; storage may require recovery")
+            else ->
+                Log.w(TAG, "$label failed and was rolled back")
+        }
+        return outcome.committed
     }
 
     /** Validate a snapshot before replacing the live knowledge base. */
@@ -1179,6 +1183,21 @@ class KbStore private constructor(context: Context) {
             }
         }
         if (f.exists() && !runCatching { f.delete() }.getOrDefault(false)) ok = false
+
+        // A parse failure is preserved as <base>.corrupt.<timestamp>. An explicit
+        // user deletion must remove those historical copies too.
+        val siblings = f.parentFile?.listFiles()
+        if (siblings == null && f.parentFile?.exists() == true) {
+            ok = false
+        } else {
+            siblings.orEmpty()
+                .filter { it.isFile && KbBackupPaths.isQuarantinedSibling(f.name, it.name) }
+                .forEach { quarantine ->
+                    if (!runCatching { quarantine.delete() }.getOrDefault(false) && quarantine.exists()) {
+                        ok = false
+                    }
+                }
+        }
         return ok
     }
 

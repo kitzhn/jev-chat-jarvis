@@ -208,12 +208,16 @@ object JevQuestions {
         return state
     }
 
+    internal fun rankKeys(candidateCount: Int): List<String> {
+        require(candidateCount in 3..4) { "rankQuestion expects 3 or 4 candidates" }
+        return listOf("reply_a", "reply_b", "reply_c", "reply_d").take(candidateCount)
+    }
+
     /** The best_reply ranking question over 3 or 4 candidates (Chinese text kept). */
     fun rankQuestion(candidates: List<String>): JSONObject {
-        require(candidates.size in 3..4) { "rankQuestion expects 3 or 4 candidates" }
-        val keys = listOf("reply_a", "reply_b", "reply_c", "reply_d")
+        val keys = rankKeys(candidates.size)
         val criteria = JSONObject()
-        keys.forEachIndexed { i, k -> criteria.put(k, candidates[i]) }
+        candidates.indices.forEach { i -> criteria.put(keys[i], candidates[i]) }
         val q = JSONObject().apply {
             put("type", "choice")
             put("instructions",

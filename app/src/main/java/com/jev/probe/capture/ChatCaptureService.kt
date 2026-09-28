@@ -173,8 +173,8 @@ open class ChatCaptureService : AccessibilityService() {
         }
         // Bubble menu: one manual screenshot + OCR, for any app at all.
         overlay?.onOcrCapture = { ocrCaptureManual() }
-        // Keep the process at foreground importance so MIUI does not freeze us.
-        runCatching { KeepAliveService.start(this) }
+        // Keep the process at foreground importance only while the assistant is enabled.
+        if (prefs.enabled) runCatching { KeepAliveService.start(this) }
         // Load the bundled OCR model now, off the main thread: the first
         // recognize() otherwise pays for it inside the screenshot callback.
         submit { MlKitOcr.warmUp() }
@@ -188,7 +188,11 @@ open class ChatCaptureService : AccessibilityService() {
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         if (event == null) return
-        if (!prefs.enabled) { clearCaptureTarget(hideOverlay = true); return }
+        if (!prefs.enabled) {
+            KeepAliveService.stop(this)
+            clearCaptureTarget(hideOverlay = true)
+            return
+        }
 
         val type = event.eventType
         // Decide "did we leave the chat app" from the REAL active window, not the
@@ -212,12 +216,15 @@ open class ChatCaptureService : AccessibilityService() {
             }
             if (fg != null && fg !in adapters) {
                 foregroundPkg = fg
-                invalidateAnalysis()
                 val drop = fg == packageName ||
                     fg.contains("launcher", ignoreCase = true) ||
                     fg == "com.miui.home" ||
                     fg == "com.android.systemui"
-                main.post { if (drop) overlay?.hide() else overlay?.showIdle(null) }
+                // Unknown apps keep an idle bubble for manual OCR, but they must
+                // never inherit the previous app's snapshot/title or analysis.
+                clearCaptureTarget(hideOverlay = drop)
+                foregroundPkg = fg
+                if (!drop) main.post { overlay?.showIdle(null) }
                 return
             }
         }
@@ -1057,6 +1064,7 @@ open class ChatCaptureService : AccessibilityService() {
         main.removeCallbacks(wechatAutoOcr)
         overlay?.hide()
         overlay = null
+        KeepAliveService.stop(this)
         if (debugInstance === this) debugInstance = null
         worker.shutdownNow()
     }

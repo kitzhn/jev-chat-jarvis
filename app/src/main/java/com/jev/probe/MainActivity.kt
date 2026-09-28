@@ -17,6 +17,7 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import com.jev.probe.core.Prefs
+import com.jev.probe.capture.KeepAliveService
 import kotlin.math.roundToInt
 
 /**
@@ -109,6 +110,8 @@ class MainActivity : AppCompatActivity() {
         val toggle = bigToggle(prefs.enabled)
         toggle.setOnClickListener {
             prefs.enabled = !prefs.enabled
+            if (prefs.enabled && isA11yEnabled()) runCatching { KeepAliveService.start(this) }
+            else KeepAliveService.stop(this)
             build()
         }
         container.addView(toggle)
@@ -157,7 +160,7 @@ class MainActivity : AppCompatActivity() {
             setPadding(0, dp(5), 0, 0)
         }
         row.addView(text(if (ok) "✓" else "✗", 14f, if (ok) green else red, bold = true).apply {
-            (this as TextView).width = dp(22)
+            width = dp(22)
         })
         row.addView(text(label + (if (ok) okWord else noWord), 13f, sub))
         return row
@@ -253,7 +256,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     companion object {
-        private const val PRIVACY_URL = "https://chatjevs.com/privacy.html"
+        private const val PRIVACY_URL = "https://github.com/kitzhn/jev-chat-jarvis/blob/main/PRIVACY.md"
         private const val GUIDE_URL =
             "https://github.com/kitzhn/jev-chat-jarvis/blob/main/docs/USER_GUIDE_ZH.md"
     }

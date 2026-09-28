@@ -152,35 +152,44 @@ data class ChatContext(
      * "title: content". Blank when there is nothing to say — callers must then
      * omit the field entirely rather than send an empty one.
      *
-     * @param defaultRelationship unused when the contact carries no relationship
-     *        of its own — that global default already goes out separately as
-     *        `chat.relationship`, so repeating it here would just duplicate it.
-     *        A contact with no relationship set simply omits the "关系：" line.
+     * The global relationship string already goes out separately as
+     * `chat.relationship`; it is deliberately not repeated here.
      */
-    fun background(defaultRelationship: String): String {
+    fun background(): String {
         val sb = StringBuilder()
+
+        fun appendLine(raw: String) {
+            val line = raw.trim()
+            if (line.isEmpty() || sb.length >= MAX_BACKGROUND_CHARS) return
+            val separator = if (sb.isEmpty()) 0 else 1
+            val room = MAX_BACKGROUND_CHARS - sb.length - separator
+            if (room <= 0) return
+            if (separator == 1) sb.append('\n')
+            sb.append(line.take(room))
+        }
+
         if (groupContact != null) {
-            sb.append("当前会话类型：群聊").append('\n')
-            sb.append("群聊：").append(groupContact.name).append('\n')
+            appendLine("当前会话类型：群聊")
+            appendLine("群聊：${groupContact.name}")
             speakerName?.takeIf { it.isNotBlank() }?.let {
-                sb.append("当前发言人：").append(it).append('\n')
+                appendLine("当前发言人：$it")
             }
             speakerContact?.let { sp ->
-                sb.append("当前发言人已关联人物：").append(sp.name).append('\n')
+                appendLine("当前发言人已关联人物：${sp.name}")
             }
         }
         contact?.let { c ->
-            sb.append("关系模型说明：以下分数和画像由用户手动维护，仅作回复背景，不代表对方真实心理。").append('\n')
+            appendLine("关系模型说明：以下分数和画像由用户手动维护，仅作回复背景，不代表对方真实心理。")
             val rel = c.relationship.trim()
-            if (rel.isNotEmpty()) sb.append("关系：").append(rel).append('\n')
-            if (c.relationshipStage.isNotBlank()) sb.append("关系阶段：")
-                .append(c.relationshipStage.trim()).append('\n')
-            sb.append("好感度：").append(AffectionScale.clamp(c.affection))
-                .append("/100（").append(AffectionScale.label(c.affection)).append("）").append('\n')
-            sb.append("信任度：").append(AffectionScale.clamp(c.trust)).append("/100").append('\n')
-            sb.append("亲密度：").append(AffectionScale.clamp(c.closeness)).append("/100").append('\n')
-            if (c.identities.isNotEmpty()) sb.append("已关联平台身份：")
-                .append(c.identities.joinToString("；") { identity ->
+            if (rel.isNotEmpty()) appendLine("关系：$rel")
+            if (c.relationshipStage.isNotBlank()) {
+                appendLine("关系阶段：${c.relationshipStage.trim()}")
+            }
+            appendLine("好感度：${AffectionScale.clamp(c.affection)}/100（${AffectionScale.label(c.affection)}）")
+            appendLine("信任度：${AffectionScale.clamp(c.trust)}/100")
+            appendLine("亲密度：${AffectionScale.clamp(c.closeness)}/100")
+            if (c.identities.isNotEmpty()) {
+                val identities = c.identities.joinToString("；") { identity ->
                     val appName = when (identity.app) {
                         "com.tencent.mobileqq" -> "QQ"
                         "com.ss.android.lark" -> "飞书"
@@ -189,27 +198,28 @@ data class ChatContext(
                     }
                     val scope = identity.scope.takeIf { it.isNotBlank() }?.let { "@$it" }.orEmpty()
                     "${appName}:${identity.title}${scope}"
-                }).append('\n')
-            if (c.profileTags.isNotEmpty()) sb.append("画像标签：")
-                .append(c.profileTags.joinToString("、")).append('\n')
-            if (c.traits.isNotBlank()) sb.append("性格/特征：")
-                .append(c.traits.trim()).append('\n')
-            if (c.communicationStyle.isNotBlank()) sb.append("沟通偏好：")
-                .append(c.communicationStyle.trim()).append('\n')
-            if (c.boundaries.isNotBlank()) sb.append("边界/忌讳：")
-                .append(c.boundaries.trim()).append('\n')
-            if (c.notes.isNotBlank()) sb.append("关于").append(c.name).append("：")
-                .append(c.notes.trim()).append('\n')
-            if (c.autoSummary.isNotBlank()) sb.append("过往摘要：")
-                .append(c.autoSummary.trim()).append('\n')
+                }
+                appendLine("已关联平台身份：$identities")
+            }
+            if (c.profileTags.isNotEmpty()) appendLine("画像标签：${c.profileTags.joinToString("、")}")
+            if (c.traits.isNotBlank()) appendLine("性格/特征：${c.traits.trim()}")
+            if (c.communicationStyle.isNotBlank()) appendLine("沟通偏好：${c.communicationStyle.trim()}")
+            if (c.boundaries.isNotBlank()) appendLine("边界/忌讳：${c.boundaries.trim()}")
+            if (c.notes.isNotBlank()) appendLine("关于${c.name}：${c.notes.trim()}")
+            if (c.autoSummary.isNotBlank()) appendLine("过往摘要：${c.autoSummary.trim()}")
         }
         if (relationshipGraph.isNotEmpty()) {
-            sb.append("联系人关系网络（用户手动维护）：").append('\n')
-            relationshipGraph.forEach { sb.append("- ").append(it).append('\n') }
+            appendLine("联系人关系网络（用户手动维护）：")
+            relationshipGraph.forEach { appendLine("- $it") }
         }
         notes.forEach { n ->
-            sb.append(n.title.trim()).append(": ").append(n.content.trim()).append('\n')
+            appendLine("${n.title.trim()}: ${n.content.trim()}")
         }
-        return sb.toString().trim()
+        return sb.toString()
+    }
+
+    companion object {
+        /** Hard cap for profile/graph/note background sent to model providers. */
+        const val MAX_BACKGROUND_CHARS = 2500
     }
 }
