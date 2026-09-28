@@ -225,4 +225,3 @@ data class ChatContext(
         const val MAX_BACKGROUND_CHARS = 2500
     }
 }
-}
