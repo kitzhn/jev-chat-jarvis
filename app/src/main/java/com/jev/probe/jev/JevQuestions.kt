@@ -213,7 +213,7 @@ object JevQuestions {
         require(candidates.size in 3..4) { "rankQuestion expects 3 or 4 candidates" }
         val keys = listOf("reply_a", "reply_b", "reply_c", "reply_d")
         val criteria = JSONObject()
-        keys.forEachIndexed { i, k -> criteria.put(k, candidates[i]) }
+        candidates.indices.forEach { i -> criteria.put(keys[i], candidates[i]) }
         val q = JSONObject().apply {
             put("type", "choice")
             put("instructions",
