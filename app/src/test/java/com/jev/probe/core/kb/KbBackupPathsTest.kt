@@ -37,4 +37,16 @@ class KbBackupPathsTest {
         assertTrue(KbBackupPaths.isQuarantined("logs/person.json.corrupt.123"))
         assertFalse(KbBackupPaths.isQuarantined("logs/person.json"))
     }
+
+    @Test fun quarantinedSiblingMustMatchTheExactBaseAndTimestamp() {
+        assertTrue(KbBackupPaths.isQuarantinedSibling(
+            "person.json", "person.json.corrupt.1727000000000"
+        ))
+        assertFalse(KbBackupPaths.isQuarantinedSibling(
+            "person.json", "other.json.corrupt.1727000000000"
+        ))
+        assertFalse(KbBackupPaths.isQuarantinedSibling(
+            "person.json", "person.json.corrupt.not-a-timestamp"
+        ))
+    }
 }
