@@ -629,9 +629,15 @@ class KbStore private constructor(context: Context) {
      */
     fun clearAll(): Boolean = synchronized(lock) {
         clearCaches()
-        unreadable.clear()
         val cleared = deleteTreeChecked(root)
-        if (cleared) Log.i(TAG, "kb cleared") else Log.w(TAG, "kb clear incomplete")
+        if (cleared) {
+            unreadable.clear()
+            Log.i(TAG, "kb cleared")
+        } else {
+            // Preserve fail-closed protection for any unreadable file that
+            // survived a partial filesystem deletion.
+            Log.w(TAG, "kb clear incomplete")
+        }
         cleared
     }
 
