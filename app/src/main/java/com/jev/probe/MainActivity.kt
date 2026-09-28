@@ -110,7 +110,7 @@ class MainActivity : AppCompatActivity() {
         val toggle = bigToggle(prefs.enabled)
         toggle.setOnClickListener {
             prefs.enabled = !prefs.enabled
-            if (prefs.enabled) runCatching { KeepAliveService.start(this) }
+            if (prefs.enabled && isA11yEnabled()) runCatching { KeepAliveService.start(this) }
             else KeepAliveService.stop(this)
             build()
         }
