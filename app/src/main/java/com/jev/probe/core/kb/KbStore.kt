@@ -703,34 +703,27 @@ class KbStore private constructor(context: Context) {
      * graph, history and relationship-event files.
      */
     private fun runKnowledgeTransaction(label: String, block: () -> Boolean): Boolean {
-        val before = try {
-            exportBackupFiles()
-        } catch (e: Exception) {
-            Log.w(TAG, "$label: could not snapshot current knowledge base: ${e.javaClass.simpleName}")
-            return false
-        }
-
-        val committed = try {
-            block()
-        } catch (e: Exception) {
-            Log.w(TAG, "$label failed: ${e.javaClass.simpleName}")
-            false
-        }
-        if (committed) {
-            clearCaches()
-            return true
-        }
-
-        val rolledBack = runCatching {
-            restoreBackupFiles(before)
-            true
-        }.getOrElse {
-            Log.e(TAG, "$label rollback failed: ${it.javaClass.simpleName}")
-            false
-        }
+        val outcome = KnowledgeMutationTransaction.execute(
+            snapshot = { exportBackupFiles() },
+            mutate = block,
+            rollback = { before ->
+                runCatching {
+                    restoreBackupFiles(before)
+                    true
+                }.getOrDefault(false)
+            }
+        )
         clearCaches()
-        if (!rolledBack) Log.e(TAG, "$label left storage requiring recovery")
-        return false
+        when {
+            outcome.committed -> Unit
+            !outcome.snapshotSucceeded ->
+                Log.w(TAG, "$label: could not snapshot current knowledge base")
+            !outcome.rollbackSucceeded ->
+                Log.e(TAG, "$label rollback failed; storage may require recovery")
+            else ->
+                Log.w(TAG, "$label failed and was rolled back")
+        }
+        return outcome.committed
     }
 
     /** Validate a snapshot before replacing the live knowledge base. */
