@@ -29,7 +29,8 @@ object ContactIdentityMatcher {
             // Backward compatibility for pre-identity data: the old app list is
             // still app-scoped, so it cannot leak a same-named person across apps.
             return contacts.firstOrNull { contact ->
-                app in contact.apps &&
+                contact.identities.isEmpty() &&
+                    app in contact.apps &&
                     (normalize(contact.name) == want ||
                         contact.aliases.any { normalize(it) == want })
             }
