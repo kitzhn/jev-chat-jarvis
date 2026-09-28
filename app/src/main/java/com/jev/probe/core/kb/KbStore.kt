@@ -399,8 +399,12 @@ class KbStore private constructor(context: Context) {
         logCache.remove(sourceId)
         relationCache.remove(sourceId)
         lastScreenCache.remove(sourceId)
-        listOf(logFile(sourceId), screenFile(sourceId), relationFile(sourceId)).forEach {
-            if (!deleteAtomicFile(it)) Log.w(TAG, "failed to delete merged source file ${it.name}")
+        val sourceFilesDeleted =
+            listOf(logFile(sourceId), screenFile(sourceId), relationFile(sourceId))
+                .all { deleteAtomicFile(it) }
+        if (!sourceFilesDeleted) {
+            Log.w(TAG, "merge contacts: source cleanup failed")
+            return false
         }
         return true
     }
