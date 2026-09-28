@@ -2,7 +2,7 @@
 
 **Jev 聊天助手在你的设备上读取你正在看的聊天，把内容发给你自己配置的模型接口做判断和起草回复。作者不运营服务器，收不到你的任何数据。**
 
-版本 v1.1，生效日期 2026-09-27。适用范围：Android 端 [jev-chat-jarvis](https://github.com/jev-chat/jev-chat-jarvis)。Windows 版（[jev-chat-windows](https://github.com/jev-chat/jev-chat-windows)）与 macOS 版（[jev-chat-jarvis-mac](https://github.com/jev-chat/jev-chat-jarvis-mac)）是各自独立的仓库和安装包，不在本政策范围内，请分别查看它们自己的说明。
+隐私政策版本 v1.2，生效日期 2026-09-28。适用范围：Jev Ultimate 2.5.2 Android 端 [jev-chat-jarvis](https://github.com/kitzhn/jev-chat-jarvis)。Windows 版（[jev-chat-windows](https://github.com/jev-chat/jev-chat-windows)）与 macOS 版（[jev-chat-jarvis-mac](https://github.com/kitzhn/jev-chat-jarvis-mac)）是各自独立的仓库和安装包，不在本政策范围内，请分别查看它们自己的说明。
 
 如果你更习惯先看结论：本项目**不是**"零数据收集"产品——它确实会把你正在看的聊天文字发给一个第三方模型接口，但那个接口地址是你自己在设置里填的，不是作者的服务器。其它数据只留在你手机里；知识库和加密备份有各自的删除入口，卸载或清除应用数据会删除全部本地数据。下面逐项说清楚"发了什么、发给谁、什么时候发、存在哪、怎么删"。
 
@@ -75,7 +75,7 @@ API 密钥会作为请求头（`Authorization`）随对应请求发给你自己�
 - 只处理你自己设备上、你自己有权查看的聊天，不处理其它人的设备。
 - 无广告、无第三方分析或统计 SDK（不含 Google Analytics、Firebase、友盟等）、不使用 Cookie 或广告标识符。
 - 作者不运营任何服务器，不接收、不留存、不出售、不用于训练任何模型你的聊天内容——因为这些内容压根不经过作者。
-- 开源：以上每一条说法，都可以在 GitHub 仓库里对照源码核实：https://github.com/jev-chat/jev-chat-jarvis
+- 开源：以上每一条说法，都可以在 GitHub 仓库里对照源码核实：https://github.com/kitzhn/jev-chat-jarvis
 
 ## 6. 你的控制权
 
@@ -85,6 +85,7 @@ API 密钥会作为请求头（`Authorization`）随对应请求发给你自己�
 - **更换或自建接口**：判断、回复、视觉三路接口地址、密钥、模型名都可以在设置页单独改成你信任的服务商，甚至自建的 OpenAI 兼容网关。
 - **只用手动分析**：关闭自动分析开关后，只有你主动点击才会触发一次判断/生成，不会在后台持续读取。
 - **会话白名单**：仅为筛选而在本机读取会话标题。按完整标题匹配（忽略大小写和末尾群人数）；需扩大范围时可显式使用 `*`。只有标题匹配后才读取消息正文；白名单留空、标题未识别或不匹配时，不读取正文、不截图/OCR、不分析，也不会将该会话内容发送给模型服务。
+- **跨 App 联系人**：不同 App 的同名会话不会仅凭名称自动当作同一个人；跨平台身份需要你显式关联，旧数据仅允许在原 App 内按名称兼容匹配。
 - **卸载即清空**：卸载应用会删除本机存储的密钥、设置、知识库与加密备份；本地备份不能在另一台设备或重装后的应用中恢复。删除全部备份时，应用会主动移除对应解密密钥。
 
 ## 7. 第三方模型服务商
@@ -101,7 +102,7 @@ API 密钥会作为请求头（`Authorization`）随对应请求发给你自己�
 
 ## 10. 联系
 
-- GitHub Issues：https://github.com/jev-chat/jev-chat-jarvis/issues
+- GitHub Issues：https://github.com/kitzhn/jev-chat-jarvis/issues
 - 公众号私信（二维码见仓库 README）
 
 ---
@@ -116,7 +117,7 @@ Jev Chat Assistant (Android) reads the chat you are currently viewing on your de
 - **Local-only storage**: API keys, endpoint settings, knowledge-base notes/contacts, and (if enabled) per-contact chat history live only in the app's private storage on your device. Optional knowledge-base backups are encrypted with an Android Keystore AES-GCM key and remain usable only in this app installation on this device. The settings page can delete one backup or all backups; deleting all backups actively removes the key, while clearing the active knowledge base does not delete backup copies. Uninstalling or clearing app data removes the local files.
 - **No ads, no third-party analytics SDKs (no Google Analytics, Firebase, etc.), no cookies or advertising identifiers.**
 - The app never sends messages automatically — you always press send yourself — and it never touches money transfers, red packets, or payments.
-- The project is open source; every claim above can be verified against the source at https://github.com/jev-chat/jev-chat-jarvis.
+- The project is open source; every claim above can be verified against the source at https://github.com/kitzhn/jev-chat-jarvis.
 - Third-party model providers you choose to use are governed by their own privacy policies, which you should review separately.
 
-Version 1.1, effective 2026-09-27. Scope: Android app only.
+Privacy policy version 1.2, effective 2026-09-28. Scope: Jev Ultimate 2.5.2 Android app only.
