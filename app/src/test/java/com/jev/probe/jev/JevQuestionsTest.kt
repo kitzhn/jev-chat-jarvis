@@ -5,18 +5,23 @@ import org.junit.Test
 
 class JevQuestionsTest {
     @Test
-    fun rankingQuestionSupportsThreeCandidates() {
-        val q = JevQuestions.rankQuestion(listOf("A", "B", "C"))
-            .getJSONObject("best_reply")
-            .getJSONObject("criteria")
-        assertEquals(3, q.length())
-        assertEquals("A", q.getString("reply_a"))
-        assertEquals("B", q.getString("reply_b"))
-        assertEquals("C", q.getString("reply_c"))
+    fun rankingKeysSupportThreeCandidatesWithoutAndroidJson() {
+        assertEquals(
+            listOf("reply_a", "reply_b", "reply_c"),
+            JevQuestions.rankKeys(3)
+        )
+    }
+
+    @Test
+    fun rankingKeysSupportFourCandidates() {
+        assertEquals(
+            listOf("reply_a", "reply_b", "reply_c", "reply_d"),
+            JevQuestions.rankKeys(4)
+        )
     }
 
     @Test(expected = IllegalArgumentException::class)
-    fun rankingQuestionStillRejectsTwoCandidates() {
-        JevQuestions.rankQuestion(listOf("A", "B"))
+    fun rankingKeysRejectTwoCandidates() {
+        JevQuestions.rankKeys(2)
     }
 }
