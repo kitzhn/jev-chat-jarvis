@@ -160,7 +160,7 @@ class MainActivity : AppCompatActivity() {
             setPadding(0, dp(5), 0, 0)
         }
         row.addView(text(if (ok) "✓" else "✗", 14f, if (ok) green else red, bold = true).apply {
-            (this as TextView).width = dp(22)
+            width = dp(22)
         })
         row.addView(text(label + (if (ok) okWord else noWord), 13f, sub))
         return row
