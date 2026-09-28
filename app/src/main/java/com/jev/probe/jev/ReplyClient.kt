@@ -93,7 +93,7 @@ class ReplyClient(private val prefs: Prefs) {
             .put("model", prefs.replyModel)
             .put("messages", messages)
             .put("temperature", temperature)
-        if (url.contains("api.deepseek.com", ignoreCase = true) &&
+        if (ApiEndpoint.hostEquals(url, "api.deepseek.com") &&
             prefs.replyModel == Prefs.DEEPSEEK_MODEL) {
             body.put("thinking", JSONObject().put(
                 "type",
@@ -103,7 +103,7 @@ class ReplyClient(private val prefs: Prefs) {
             // than implying that the sampling knob still has an effect.
             if (prefs.deepSeekThinkingEnabled) body.remove("temperature")
         }
-        if (url.contains("openrouter.ai", ignoreCase = true)) {
+        if (ApiEndpoint.hostEquals(url, "openrouter.ai")) {
             body.put("usage", JSONObject().put("include", true))
         }
         val resp = HttpJson.post(url, prefs.effectiveReplyKey(), body, Route.REPLY, HttpJson.headersFor(url))
