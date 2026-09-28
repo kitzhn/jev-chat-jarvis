@@ -17,6 +17,7 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import com.jev.probe.core.Prefs
+import com.jev.probe.capture.KeepAliveService
 import kotlin.math.roundToInt
 
 /**
@@ -109,6 +110,8 @@ class MainActivity : AppCompatActivity() {
         val toggle = bigToggle(prefs.enabled)
         toggle.setOnClickListener {
             prefs.enabled = !prefs.enabled
+            if (prefs.enabled) runCatching { KeepAliveService.start(this) }
+            else KeepAliveService.stop(this)
             build()
         }
         container.addView(toggle)
