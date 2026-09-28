@@ -87,6 +87,14 @@ object ApiUsageStore {
     private const val STATE_VERSION = 2
     private const val USD_CNY = 6.71
 
+    // Avoid reparsing up to 5000 JSON rows for every API call/dashboard read.
+    // Persistence stays AtomicFile-based and synchronous; file stamp/length
+    // invalidate the cache if something outside this process changes the ledger.
+    private var cachedState: UsageState? = null
+    private var cachedPath: String? = null
+    private var cachedStamp: Long = Long.MIN_VALUE
+    private var cachedLength: Long = Long.MIN_VALUE
+
     /** Metering must never turn an already successful, billable API call into an error. */
     fun recordSafely(
         context: Context, route: String, baseUrl: String, model: String,
@@ -218,6 +226,7 @@ object ApiUsageStore {
 
     fun clear(context: Context) = synchronized(lock) {
         AtomicFile(usageFile(context)).delete()
+        invalidateCache()
     }
 
     private fun summarizeRecords(records: List<ApiUsageRecord>): ApiUsageSummary =
@@ -396,8 +405,20 @@ object ApiUsageStore {
 
     private fun loadState(context: Context): UsageState {
         val file = usageFile(context)
-        if (!file.exists() && !File(file.path + ".bak").exists())
-            return UsageState(mutableListOf(), mutableListOf())
+        val backup = File(file.path + ".bak")
+        val stamp = maxOf(file.lastModified(), backup.lastModified())
+        val length = file.length() + backup.length()
+        cachedState?.let { cached ->
+            if (cachedPath == file.absolutePath && cachedStamp == stamp && cachedLength == length) {
+                return cached
+            }
+        }
+
+        if (!file.exists() && !backup.exists()) {
+            return UsageState(mutableListOf(), mutableListOf()).also {
+                cacheState(file, it)
+            }
+        }
         return try {
             val raw = AtomicFile(file).openRead().bufferedReader(Charsets.UTF_8).use { it.readText() }
             val trimmed = raw.trimStart()
@@ -422,9 +443,10 @@ object ApiUsageStore {
             val rollupCount = state.rollups.size
             pruneRollups(state.rollups)
             if (state.rollups.size != rollupCount) needsMigration = true
-            if (needsMigration) writeState(context, state)
+            if (needsMigration) writeState(context, state) else cacheState(file, state)
             state
         } catch (e: Exception) {
+            invalidateCache()
             // Never replace an unreadable ledger with an apparently empty one.
             throw IllegalStateException("API 用量记录读取失败，原文件已保留", e)
         }
@@ -566,9 +588,25 @@ object ApiUsageStore {
         try {
             output.write(root.toString().toByteArray(Charsets.UTF_8))
             atomic.finishWrite(output)
+            cacheState(file, state)
         } catch (e: Exception) {
             atomic.failWrite(output)
+            invalidateCache()
             throw e
         }
+    }
+
+    private fun cacheState(file: File, state: UsageState) {
+        cachedState = state
+        cachedPath = file.absolutePath
+        cachedStamp = maxOf(file.lastModified(), File(file.path + ".bak").lastModified())
+        cachedLength = file.length() + File(file.path + ".bak").length()
+    }
+
+    private fun invalidateCache() {
+        cachedState = null
+        cachedPath = null
+        cachedStamp = Long.MIN_VALUE
+        cachedLength = Long.MIN_VALUE
     }
 }
