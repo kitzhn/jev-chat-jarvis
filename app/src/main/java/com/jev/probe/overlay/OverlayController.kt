@@ -207,7 +207,7 @@ class OverlayController(private val ctx: Context) {
 
     private fun attachBubbleTouch(v: View, params: WindowManager.LayoutParams) {
         var startX = 0; var startY = 0; var touchX = 0f; var touchY = 0f
-        var moved = false; var downTime = 0L; var longFired = false
+        var moved = false; var longFired = false
         val longPress = Runnable {
             if (!moved) { longFired = true; showBubbleMenu() }
         }
@@ -215,7 +215,7 @@ class OverlayController(private val ctx: Context) {
             when (e.action) {
                 MotionEvent.ACTION_DOWN -> {
                     startX = params.x; startY = params.y; touchX = e.rawX; touchY = e.rawY
-                    moved = false; longFired = false; downTime = System.currentTimeMillis()
+                    moved = false; longFired = false
                     v.postDelayed(longPress, 500); true
                 }
                 MotionEvent.ACTION_MOVE -> {
@@ -299,7 +299,7 @@ class OverlayController(private val ctx: Context) {
 
     // ------------------------------------------------------------ public API
 
-    fun showIdle(title: String?) {
+    fun showIdle(_title: String?) {
         ensureRoot(); bubble?.alpha = 0.55f
         // Either there is genuinely nothing to show yet, or the panel is empty
         // for some other reason (root got rebuilt after hide(), leaving
