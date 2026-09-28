@@ -2,6 +2,9 @@ package com.jev.probe.overlay
 
 import android.content.Context
 import android.content.Intent
+import android.content.ClipDescription
+import android.os.Build
+import android.os.PersistableBundle
 import android.graphics.Color
 import android.graphics.PixelFormat
 import android.graphics.Typeface
@@ -682,7 +685,13 @@ class OverlayController(private val ctx: Context) {
 
     private fun copy(text: String) {
         val cm = ctx.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
-        cm.setPrimaryClip(android.content.ClipData.newPlainText("jev_reply", text))
+        val clip = android.content.ClipData.newPlainText("jev_reply", text)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            clip.description.extras = PersistableBundle().apply {
+                putBoolean(ClipDescription.EXTRA_IS_SENSITIVE, true)
+            }
+        }
+        cm.setPrimaryClip(clip)
         toast("已复制")
     }
 
