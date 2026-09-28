@@ -1183,6 +1183,21 @@ class KbStore private constructor(context: Context) {
             }
         }
         if (f.exists() && !runCatching { f.delete() }.getOrDefault(false)) ok = false
+
+        // A parse failure is preserved as <base>.corrupt.<timestamp>. An explicit
+        // user deletion must remove those historical copies too.
+        val siblings = f.parentFile?.listFiles()
+        if (siblings == null && f.parentFile?.exists() == true) {
+            ok = false
+        } else {
+            siblings.orEmpty()
+                .filter { it.isFile && KbBackupPaths.isQuarantinedSibling(f.name, it.name) }
+                .forEach { quarantine ->
+                    if (!runCatching { quarantine.delete() }.getOrDefault(false) && quarantine.exists()) {
+                        ok = false
+                    }
+                }
+        }
         return ok
     }
 
