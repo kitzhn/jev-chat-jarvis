@@ -165,7 +165,7 @@ def dump():
         time.sleep(.5)
     raise RuntimeError("uiautomator window dump not ready")
 
-for attempt in range(10):
+for attempt in range(18):
     root = dump()
     nodes = list(root.iter("node"))
     # Cold boots can leave a known Android system app ANR above Jev. Dismiss
