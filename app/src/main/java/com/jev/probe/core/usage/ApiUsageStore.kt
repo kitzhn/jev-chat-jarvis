@@ -3,6 +3,7 @@ package com.jev.probe.core.usage
 import android.content.Context
 import android.util.AtomicFile
 import android.util.Log
+import com.jev.probe.jev.ApiEndpoint
 import com.jev.probe.jev.Route
 import org.json.JSONArray
 import org.json.JSONObject
@@ -321,7 +322,7 @@ object ApiUsageStore {
         at: Long,
         directCostUsd: Double?
     ): Pair<Double, Boolean> {
-        if (directCostUsd != null && baseUrl.contains("openrouter.ai", true)) {
+        if (directCostUsd != null && ApiEndpoint.hostEquals(baseUrl, "openrouter.ai")) {
             return directCostUsd * USD_CNY to true
         }
 
@@ -330,7 +331,7 @@ object ApiUsageStore {
         val cached = cachedInputTokens.toDouble().coerceAtMost(input)
         val uncached = (input - cached).coerceAtLeast(0.0)
 
-        if (baseUrl.contains("api.deepseek.com", true) && model == "deepseek-flash") {
+        if (ApiEndpoint.hostEquals(baseUrl, "api.deepseek.com") && model == "deepseek-flash") {
             val peak = isDeepSeekPeak(at)
             val cacheRate = if (peak) 0.04 else 0.02
             val inputRate = if (peak) 2.0 else 1.0
@@ -341,11 +342,11 @@ object ApiUsageStore {
             return cost to true
         }
 
-        if (baseUrl.contains("openrouter.ai", true) && model == "typesafe/jev-1.13") {
+        if (ApiEndpoint.hostEquals(baseUrl, "openrouter.ai") && model == "typesafe/jev-1.13") {
             return input / 1_000_000.0 * 0.042 * USD_CNY to true
         }
 
-        if (baseUrl.contains("openrouter.ai", true) && model == "deepseek/deepseek-v4.1-flash") {
+        if (ApiEndpoint.hostEquals(baseUrl, "openrouter.ai") && model == "deepseek/deepseek-v4.1-flash") {
             val costUsd = uncached / 1_000_000.0 * 0.13 +
                 cached / 1_000_000.0 * 0.0026 +
                 output / 1_000_000.0 * 0.52
