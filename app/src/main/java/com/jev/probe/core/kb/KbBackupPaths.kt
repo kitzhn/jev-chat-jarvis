@@ -32,4 +32,11 @@ internal object KbBackupPaths {
 
     fun isQuarantined(relativePath: String): Boolean =
         relativePath.substringAfterLast('/').contains(".corrupt.")
+
+    /** True only for a timestamped quarantine copy of this exact base filename. */
+    fun isQuarantinedSibling(baseName: String, candidateName: String): Boolean {
+        val prefix = "$baseName.corrupt."
+        return candidateName.startsWith(prefix) &&
+            corruptStamp.matches(candidateName.removePrefix(prefix))
+    }
 }
