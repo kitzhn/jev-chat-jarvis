@@ -33,8 +33,5 @@
         <activity
             android:name="com.jev.probe.AdaptiveModelDemoActivity"
             android:exported="${integrationControlsExported}" />
-        <activity
-            android:name="com.jev.probe.IntegrationMatrixDemoActivity"
-            android:exported="${integrationControlsExported}" />
     </application>
 </manifest>
