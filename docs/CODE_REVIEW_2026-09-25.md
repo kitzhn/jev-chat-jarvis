@@ -310,3 +310,38 @@ No MAJOR item below should be implemented until explicitly approved. Checked ite
 - [x] MAJOR-09 — make DeepSeek thinking mode explicit/configurable for reply and vision calls.
 - [x] MAJOR-10 — keep CI/test-only components non-exported in distributable Debug and verify the built manifest.
 
+
+---
+
+## 2026-09-28 — 2.5.2 full repository re-review
+
+Scope was repeated against the `v2.5.2` / `main` codebase, including Android runtime code, KB/backup storage, Accessibility/OCR, API routing, Debug fixtures, Gradle, GitHub Actions, tools and site assets.
+
+| ID | Level | Status | Area | Resolution |
+|---|---|---|---|---|
+| MAJOR-11 | MAJOR / PRIVACY | **FIXED on review branch** | Contact identity | App-scoped contact matching now fails closed across apps. Exact identity or legacy same-app association is required; cross-app identity still requires explicit user linking. |
+| MAJOR-12 | MAJOR / DATA | **FIXED on review branch** | Contact merge | Multi-file merges now run behind a complete committed KB snapshot and rollback the whole KB if any write or source cleanup fails. |
+| MAJOR-13 | MAJOR / DATA | **FIXED on review branch** | Contact delete | Multi-file deletion now uses the same snapshot/rollback guard, including history/event side-file cleanup. |
+| MEDIUM-08 | MEDIUM | **FIXED** | History deletion | Per-contact history cleanup removes AtomicFile base/backup/new sidecars and reports failure. |
+| MEDIUM-09 | MEDIUM | **FIXED** | Full KB deletion | Full clear verifies recursive deletion and UI no longer reports unconditional success. |
+| MEDIUM-10 | MEDIUM | **FIXED** | Capture lifecycle | Entering an unsupported app clears the previous snapshot/title/generation while leaving only an idle manual-OCR bubble. |
+| MEDIUM-11 | MEDIUM | **FIXED** | KeepAlive | Master-off and Accessibility destruction explicitly stop the foreground keepalive service. |
+| MEDIUM-12 | MEDIUM | **ALREADY FIXED IN 2.5.2** | WeChat notifications | Notification listener already checks `prefs.enabled` before reading the notification title. No code change required. |
+| MEDIUM-13 | MEDIUM | **FIXED** | Context budget | Model background (profile + graph + notes) now has a 2500-character hard cap; history keeps its independent bounded window. |
+| MINOR-08 | MINOR | **FIXED** | Ranking | `rankQuestion` now safely builds criteria for either 3 or 4 candidates. |
+| MINOR-09 | MINOR / PRIVACY | **FIXED** | Clipboard | Manual long-press copies are marked sensitive on Android 13+, matching the fill fallback path. |
+| MINOR-10 | MINOR | **FIXED** | Provider detection | DeepSeek/OpenRouter special handling and metering use parsed exact hostnames instead of substring matching. |
+| MINOR-11 | MINOR / SUPPLY CHAIN | **FIXED** | Gradle wrapper | Gradle 8.9 binary distribution now has the official SHA-256 pinned. |
+| DOC-01 | DOC | **FIXED** | Fork site/privacy | Android download, repository and privacy links now target the Ultimate fork / 2.5.2 release instead of the stale upstream v1.4 APK. |
+| DEAD-01 | DEAD-CODE | **FIXED** | Preferences | Inactive `ocrEngine`, `ocrForUnknownApps` and `autoSummary` settings were removed. |
+| MINOR-06 | MINOR | **MITIGATED** | Usage I/O | Parsed usage state is cached process-wide with file stamp/length invalidation. Atomic full-file persistence remains intentionally unchanged to avoid a risky storage migration. |
+| MINOR-07 | MINOR / DUPLICATE-TEST | **FIXED** | Debug tests | Removed the redundant integration matrix activity; AdaptiveModelDemo remains the canonical adaptive integration page. |
+
+### Transaction semantics
+
+`AtomicFile` protects individual JSON documents. The 2026-09-28 fixes add a second layer for operations spanning contacts, graph, chat history, last-screen state and relationship-event files: snapshot the complete committed KB first, attempt the mutation, and restore the snapshot if any stage fails. Failure-injection unit tests cover snapshot failure, mutation failure/exception, successful commit and rollback failure reporting.
+
+### Remaining test gaps
+
+- Real QQ / WeChat / X / Feishu behavior still needs periodic ARM64 physical-device regression; x86_64 messenger fixtures validate Jev's adapters and control flow, not vendor-app internals.
+- CI deliberately does not spend paid provider API calls. Live provider behavior remains a manual release check when presets/pricing/protocols change.
