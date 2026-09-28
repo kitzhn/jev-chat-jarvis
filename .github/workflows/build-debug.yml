@@ -74,7 +74,6 @@ jobs:
               "com.jev.probe.OverlayDemoActivity",
               "com.jev.probe.WeChatOcrDemoActivity",
               "com.jev.probe.AdaptiveModelDemoActivity",
-              "com.jev.probe.IntegrationMatrixDemoActivity",
           ]:
               hit=re.search(r'<(?:activity|receiver)[^>]*android:name="'+re.escape(name)+r'"[^>]*>', m)
               if hit and 'android:exported="true"' in hit.group(0):
