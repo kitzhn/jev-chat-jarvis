@@ -33,91 +33,77 @@ Ultimate 版在原项目基础上增加：
 
 ## 2. 安装
 
-### 推荐方式：GitHub Actions APK
+### 推荐：固定签名正式版
 
-直接打开我的构建入口：
+长期自己使用或发给朋友，优先安装 GitHub Release 中的固定签名正式版：
 
-- [Build Android Debug APK（测试版）](https://github.com/kitzhn/jev-chat-jarvis/actions/workflows/build-debug.yml)
-- [Build Signed Ultimate Release（正式分发版）](https://github.com/kitzhn/jev-chat-jarvis/actions/workflows/build-release.yml)
+- **[Jev Ultimate 2.5.2 ARM64 APK](https://github.com/kitzhn/jev-chat-jarvis/releases/latest/download/jev-ultimate-arm64.apk)**
+- [SHA-256 校验文件](https://github.com/kitzhn/jev-chat-jarvis/releases/latest/download/jev-ultimate-arm64.apk.sha256)
+- [v2.5.2 发布页](https://github.com/kitzhn/jev-chat-jarvis/releases/tag/v2.5.2)
+- [全部 Releases](https://github.com/kitzhn/jev-chat-jarvis/releases)
 
-打开最新成功的运行记录，在 **Artifacts** 下载 `jev-ultimate-debug` 或 `jev-ultimate-release`，解压后安装 APK。
+正式版 application id：`io.github.kitzhn.jevultimate`。固定签名的好处是后续可以直接覆盖升级，App 私有数据、联系人与设置会继续保留。
 
-**Debug 版只建议自己测试。** 需要长期发给朋友、覆盖升级并保留数据时，请使用固定签名 Release。
+### Debug 测试版
 
-Ultimate Debug 版使用独立 application id：
+[Build Android Debug APK](https://github.com/kitzhn/jev-chat-jarvis/actions/workflows/build-debug.yml) 的最新成功运行会产出 `jev-ultimate-debug`。Debug application id 为 `io.github.kitzhn.jevultimate.debug`，可以和正式版并存。
 
-`io.github.kitzhn.jevultimate.debug`
+普通可下载 Debug APK 的 CI 测试组件默认**不导出**；只有 Android 模拟器回归设置 `JEV_INTEGRATION_FIXTURES=1` 时才临时开放测试入口。但 Debug 仍主要用于开发 / 测试，不建议作为朋友长期使用的分发包。
 
-因此可以和原版 Jev 同时安装，互不覆盖。
-
-Android 最低版本：Android 11（API 30）。
+Android 最低版本：Android 11（API 30）。当前正式包面向 ARM64 / `arm64-v8a`。
 
 ## 3. 首次使用
 
-打开 App 后按首页提示完成三项：
+建议严格按下面顺序配置：
 
-1. **无障碍权限**：允许读取当前聊天窗口结构，以及把候选回复填入输入框。
-2. **悬浮窗权限**：允许在聊天软件上方显示 Jev 悬浮球和分析面板。
-3. **API Key**：至少需要判断接口的有效密钥。
+1. **无障碍权限**：用于读取已允许会话的当前窗口结构、执行 Accessibility screenshot，以及把候选回复填入输入框。
+2. **悬浮窗权限**：用于显示悬浮球和分析面板。
+3. **API 配置**：至少配置有效的判断接口；回复 / 视觉是否可继承 Key 取决于是否与上游路由属于同一 API origin。
+4. **会话白名单**：每行填写一个允许分析的完整会话标题。白名单为空时默认不读取正文。
+5. **打开 Jev 总开关**。
 
-小米 / HyperOS 用户还建议在系统应用详情中开启：
+小米 / HyperOS 等国产 ROM 建议再开启：
 
 - 自启动
 - 后台运行
 - 电池策略：无限制
 
-否则系统可能冻结无障碍服务。
+关闭 Jev 总开关后，前台 KeepAlive 会停止；不会继续为了保活而保持 `START_STICKY` 常驻。
+
+如果从很早的版本升级后 OCR / 截屏一直不可用，可把系统里的 Jev 无障碍服务关掉一次再重新开启，让新的截屏能力重新绑定。
+
+### 微信额外权限
+
+微信实验自动 OCR 默认关闭。若启用“通知优先触发 OCR”，还需要授予**通知读取权限**。通知正文不会被保存；通知标题只用于和当前打开会话做匹配。
 
 ## 4. 最简单的 API 接入方式
 
-进入：
+进入：**首页 → API 与设置 → 快速 API 配置**。
 
-**首页 → API 与设置 → 快速 API 配置**
+第一次使用最简单的是 **OpenRouter 一把 Key**：
 
-推荐第一次使用选择：
+1. 点击“推荐：OpenRouter 一把 Key”。
+2. 判断 / 回复 / 视觉三路会同时指向 OpenRouter。
+3. 只在判断接口填写自己的 OpenRouter API Key。
+4. 回复 Key、视觉 Key 可以留空，因为这三路属于同一 API origin。
+5. 分别点击“测试判断 / 测试回复 / 测试视觉”。
+6. 全部符合预期后点击“保存全部设置”。
 
-### OpenRouter 一把 Key
+### 2.5.2 的密钥继承规则
 
-点击：
+Key 不再因为“看起来像同一家服务商”就随意复用，而是要求 URL 的 **scheme + hostname + 有效端口**一致。
 
-**推荐：OpenRouter 一把 Key**
+例如：
 
-它会自动配置：
+- 判断 `https://openrouter.ai/...`，回复 `https://openrouter.ai/...` → 可以继承。
+- 判断 OpenRouter，回复 `https://api.deepseek.com/v1` → **不能继承**，回复必须填写 DeepSeek Key。
+- 自定义镜像域名即使代理 OpenRouter，也不会被当成官方 `openrouter.ai`。
 
-- 判断接口：OpenRouter + Jev
-- 回复接口：OpenRouter
-- 视觉接口：OpenRouter
+这个限制的目的是避免把 A 服务商的 Bearer Key 意外发到 B 服务商。
 
-然后只需要在“判断接口”的密钥框填写自己的 OpenRouter API Key。
+### 为什么判断接口和回复接口分开
 
-回复密钥和视觉密钥留空时，会自动回退使用判断接口密钥。
-
-最后分别点击：
-
-- 测试判断
-- 测试回复
-- 测试视觉
-
-都成功后，点击**保存全部设置**。
-
-### 为什么判断接口和回复接口是分开的
-
-判断接口负责：
-
-- 对方真实意图
-- 当前关系张力
-- 是否适合立即回复
-- 候选回复排序
-
-回复接口负责真正生成候选文字。
-
-因此可以采用例如：
-
-- 判断：Jev / OpenRouter
-- 回复：DeepSeek 官方
-- 视觉：通义或 OpenRouter
-
-这三路可以完全独立。
+判断接口负责意图 / 风险 / 回复时机 / 候选排序；回复接口负责生成实际文字。视觉接口主要用于视觉连通测试和兼容视觉模型能力，因此三路可以完全独立配置。
 
 ## 5. 切换到 DeepSeek 回复
 
@@ -204,28 +190,30 @@ Base URL 应填写到 `/v1` 为止，例如：
 
 ## 8. 联系人系统：一个现实的人，多个平台身份
 
-Ultimate 版不再把“QQ 昵称”“飞书姓名”“X handle”当成三个独立的人。
+Ultimate 的核心身份模型是：
 
-数据结构是：
-
-```
+```text
 现实联系人 Contact
 ├── QQ + 会话标题
 ├── 飞书 + 会话标题
 ├── X + 会话标题
-├── 其它平台身份
-├── 人物画像
+├── 群聊中的 App + 群名 + 发言人昵称
+├── 人物画像 / 边界
 ├── 好感 / 信任 / 亲密
 ├── 聊天历史
 └── 好感变化历史
 ```
 
-匹配优先级：
+### 当前匹配规则
 
-1. **App + 会话标题** 精确身份
-2. 旧版本 name / aliases 兼容匹配
+1. **App + 会话标题** 的精确平台身份优先。
+2. 旧数据如果只有 `name / aliases / apps[]`，只允许在 `apps[]` 已明确包含**当前 App**时做同 App 兼容匹配。
+3. 不同 App 中出现相同姓名 / alias 时，**不会自动认定为同一个现实人物**。
+4. 跨 App、跨群聊人物绑定必须由用户显式选择“关联当前会话 / 当前发言人到已有联系人”。
 
-不会仅因为两个 App 中出现相同昵称就自动判断为同一个人。
+例如 QQ 里叫“张三”、飞书里也叫“张三”，系统不会仅凭同名把两者合并。只有你确认是同一个人并手动关联后，才共享同一份画像与历史上下文。
+
+这样做是为了避免常见昵称、重名或群成员同名导致人物画像串错。
 
 ## 9. 创建联系人
 
@@ -285,25 +273,24 @@ X: @wang123 ─┘
 
 三处聊天共用同一份画像、关系模型和历史上下文。
 
-## 11. 重复联系人自动合并
+## 11. 显式合并重复联系人
 
-如果之前误建成：
+如果之前误建成两个联系人，例如：
 
 - 联系人 A：小王 / QQ
 - 联系人 B：王某某 / 飞书
 
-当你从飞书聊天明确选择“关联到联系人 A”时，系统会把 B 合并进 A。
+你可以在当前聊天中明确选择“关联到联系人 A”。如果当前身份已经属于 B，系统会执行显式合并。
 
-会合并：
+合并内容包括平台身份、aliases、App 列表、画像标签、聊天历史、关系变化记录、策略选择统计等；主联系人已有的核心关系分数优先保留。
 
-- 平台身份
-- aliases
-- App 列表
-- 画像标签
-- 聊天历史
-- 好感变化记录
+### 2.5.2 的事务保护
 
-主联系人已有的好感 / 信任 / 亲密等核心分数优先保留。
+合并前会先读取一份完整知识库快照。联系人文件、历史、关系事件、关系图或源联系人文件删除中的任一步失败，操作会报告失败并尝试把整份知识库恢复到合并前状态。
+
+联系人删除也使用相同的整库快照回滚语义，避免出现“联系人删了但关系边还在”或“提示失败但历史已经被改掉”的半提交状态。
+
+如果设备本身已经处于严重存储故障状态，回滚也可能失败，因此重要联系人数据仍建议定期使用本地加密备份。
 
 ## 12. 好感度系统
 
