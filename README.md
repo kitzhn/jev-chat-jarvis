@@ -103,26 +103,54 @@
 
 ## 快速开始
 
-**1. 装包。** Ultimate 正式版请优先使用 GitHub Releases：
+> 完整图文 / 进阶说明见：[**Jev Ultimate 中文使用说明书**](docs/USER_GUIDE_ZH.md)。
 
-- **正式版 APK 直接下载：** [Jev Ultimate 2.5.2（ARM64）](https://github.com/kitzhn/jev-chat-jarvis/releases/latest/download/jev-ultimate-arm64.apk) · [SHA-256 校验文件](https://github.com/kitzhn/jev-chat-jarvis/releases/latest/download/jev-ultimate-arm64.apk.sha256) · [v2.5.2 发布页](https://github.com/kitzhn/jev-chat-jarvis/releases/tag/v2.5.2)。以后更新仍使用 latest 直链。
-- **发布新版本：** [Build Signed Ultimate Release](https://github.com/kitzhn/jev-chat-jarvis/actions/workflows/build-release.yml)。
-- **历史正式版：** [查看全部 Releases](https://github.com/kitzhn/jev-chat-jarvis/releases)。
-- **自己测试：** [Build Android Debug APK](https://github.com/kitzhn/jev-chat-jarvis/actions/workflows/build-debug.yml) → 打开最新成功运行 → Artifacts → `jev-ultimate-debug`。
-- **模拟器验证截图：** [Android 15 Emulator Regression](https://github.com/kitzhn/jev-chat-jarvis/actions/workflows/ui-emulator.yml) → Artifacts → `jev-ultimate-emulator-evidence`。
+### 1. 安装正式版
 
-Android 11+，当前构建面向 ARM64 / `arm64-v8a`。Debug 与 Release 签名不同，互相切换时可能需要先卸载旧包。
+优先使用固定签名 Release，便于后续覆盖升级并保留本地数据：
 
-**2. 填密钥。** 打开 App → 设置 →「接口」分三张卡：判断接口 / 回复接口 / 视觉接口。最简单只填「判断接口」一栏的 [OpenRouter](https://openrouter.ai/) API Key，其余两栏留空会自动继承这把密钥就能用。默认回复模型为 `deepseek/deepseek-v4.1-flash`；也可在「回复接口」选择 OpenRouter / DeepSeek 官方 / 通义兼容预设或自填地址，每张卡都有独立的一键连通测试。
+- **[下载 Jev Ultimate 2.5.2（ARM64）](https://github.com/kitzhn/jev-chat-jarvis/releases/latest/download/jev-ultimate-arm64.apk)**
+- [SHA-256 校验文件](https://github.com/kitzhn/jev-chat-jarvis/releases/latest/download/jev-ultimate-arm64.apk.sha256)
+- [v2.5.2 发布页](https://github.com/kitzhn/jev-chat-jarvis/releases/tag/v2.5.2)
 
-**3. 开权限。** 按主页向导开三项：
+Android 11+（API 30+），正式构建为 `arm64-v8a`。Debug 包名为 `io.github.kitzhn.jevultimate.debug`，可与正式版并存；Debug 主要用于测试。
 
-- 无障碍（读消息；升级到 1.3+ 后需要把无障碍关掉再打开一次，截屏能力才生效）
-- 悬浮窗 / 显示在其他应用上层（展示分析）
-- 自启动 + 省电无限制（小米 / HyperOS 必做，否则后台被冻结读不到消息）
+### 2. 打开必要权限
 
-装过 debug 包的要先卸载再装 release（签名不同），卸载会清掉密钥和设置。小米 / HyperOS 重装后悬浮窗权限会被重置，装完按向导再开一次。
+1. **无障碍服务**：读取允许的聊天窗口结构、执行截屏 OCR、把候选回复填进输入框。
+2. **悬浮窗**：显示 Jev 悬浮球和分析面板。
+3. 小米 / HyperOS 等 ROM 建议额外开启 **自启动 + 后台运行 + 电池无限制**。
+4. 微信如需“通知优先触发 OCR”，再单独授予 **通知读取权限**。
 
+从较早版本升级、或 OCR 一直拿不到截屏能力时，可把 Jev 无障碍服务关闭一次再重新开启。
+
+### 3. 配置模型接口
+
+进入 **首页 → API 与设置**。最省事的是“OpenRouter 一把 Key”快速方案：三路都使用 OpenRouter，只在判断接口填写 Key；回复 / 视觉 Key 留空时，因为它们属于同一 API origin（scheme + host + port），可以安全继承。
+
+如果回复改成 DeepSeek 官方、视觉改成另一家服务商，则必须给该路由填写自己的 Key。**不同 API origin 不会继承 Key**。
+
+远程自定义地址必须使用 HTTPS；只有 `localhost`、`127.0.0.1`、`::1` 等本机回环地址允许 HTTP。
+
+### 4. 设置会话白名单
+
+在设置的分析区域填写会话白名单，每行一个允许分析的完整会话标题。只有标题先匹配白名单后，才会继续读取正文、OCR 或调用模型；白名单为空时默认不读取聊天正文。需要允许全部会话时可显式填写 `*`，但这会扩大读取范围。
+
+### 5. 打开助手并进入聊天
+
+| App | 日常用法 |
+|---|---|
+| **QQ** | 进入白名单聊天即可；群聊会尝试识别当前发言人 |
+| **飞书 / Lark** | 正文不可读时自动使用本地 ML Kit OCR |
+| **X / Twitter** | 当前主要验证中文界面私信 |
+| **微信** | 主动开启“微信实验自动 OCR”；推荐再开启通知优先触发，仅在通知标题和当前会话匹配时计划截图 |
+| **其它 App** | 长按悬浮球 → **截屏识别一次**；整屏 OCR 无法可靠区分我 / 对方 |
+
+微信或 ROM 若拒绝 Accessibility screenshot，Jev 只会降级，不会绕过系统或应用的防截屏策略。
+
+### 6. 使用候选回复
+
+分析后显示四种策略：**温柔承接 / 轻松自然 / 稳妥克制 / 主动推进**。点击候选会尝试填入输入框，长按候选复制。Android 13+ 会将 Jev 写入剪贴板的回复标记为敏感内容。**Jev 不会点击发送键，发送前始终由你自己检查和确认。**
 ## 功能
 
 ### 判断与候选回复
