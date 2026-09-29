@@ -6,11 +6,11 @@
 
 **装在手机上的「对话副驾」：你在任何聊天 App 里聊天，它在旁边读懂对方、告诉你该怎么回，一键填进输入框，发不发由你。**
 
-[![Stars](https://img.shields.io/github/stars/jev-chat/jev-chat-jarvis?style=flat-square&logo=github&label=Stars)](https://github.com/jev-chat/jev-chat-jarvis/stargazers)
-[![Forks](https://img.shields.io/github/forks/jev-chat/jev-chat-jarvis?style=flat-square&logo=github&label=Forks)](https://github.com/jev-chat/jev-chat-jarvis/forks)
+[![Stars](https://img.shields.io/github/stars/kitzhn/jev-chat-jarvis?style=flat-square&logo=github&label=Stars)](https://github.com/kitzhn/jev-chat-jarvis/stargazers)
+[![Forks](https://img.shields.io/github/forks/kitzhn/jev-chat-jarvis?style=flat-square&logo=github&label=Forks)](https://github.com/kitzhn/jev-chat-jarvis/forks)
 [![Version](https://img.shields.io/badge/%E7%89%88%E6%9C%AC-v2.5.2-1f6feb?style=flat-square)](CHANGELOG.md)
 [![Android](https://img.shields.io/badge/Android-11%2B-3DDC84?style=flat-square&logo=android&logoColor=white)](#快速开始)
-[![License](https://img.shields.io/github/license/jev-chat/jev-chat-jarvis?style=flat-square)](LICENSE)
+[![License](https://img.shields.io/github/license/kitzhn/jev-chat-jarvis?style=flat-square)](LICENSE)
 
 [上游官网](https://chatjevs.com) · [下载正式版 APK v2.5.2（ARM64）](https://github.com/kitzhn/jev-chat-jarvis/releases/latest/download/jev-ultimate-arm64.apk) · [SHA-256 校验文件](https://github.com/kitzhn/jev-chat-jarvis/releases/latest/download/jev-ultimate-arm64.apk.sha256) · [Releases](https://github.com/kitzhn/jev-chat-jarvis/releases) · [测试版](https://github.com/kitzhn/jev-chat-jarvis/actions/workflows/build-debug.yml) · [更新日志](CHANGELOG.md) · [macOS 版](https://github.com/jev-chat/jev-chat-mac) · [Windows 版](https://github.com/jev-chat/jev-chat-windows)
 
@@ -35,6 +35,15 @@
 > OpenRouter 无密钥配置示例：[docs/api-config-openrouter.example.json](docs/api-config-openrouter.example.json) · [代码审阅记录](docs/CODE_REVIEW_2026-09-25.md)
 >
 > Ultimate Debug 版使用独立包名后缀，可与官方版并存。仓库不包含任何个人联系人数据或 API Key。
+>
+> **2.5.2 近期一致性 / 安全加固：**
+> - 联系人实时匹配以 **App + 会话标题** 的平台身份优先；不同 App 里即使昵称相同，也不会仅凭姓名 / alias 自动认成同一个人。
+> - 显式合并联系人、删除联系人采用整份知识库快照回滚语义；任一关键文件操作失败会报告失败并恢复原状态，避免“只改了一半”。
+> - 单联系人历史与“清空知识库”会核对实际删除结果，不再无条件提示成功。
+> - 切到未适配 App 时会清掉上一会话 snapshot；关闭助手后前台 KeepAlive 不再继续常驻。
+> - 发送给模型的最终背景有约 2400 字符硬上限，避免常驻笔记 / 人物画像无限膨胀。
+> - OpenRouter / DeepSeek 的专属请求逻辑按**精确 hostname**识别；远程 API 仅允许 HTTPS，本机回环地址才允许 HTTP。
+> - 普通 Debug APK 的 CI 测试入口默认不导出；只有模拟器回归设置 `JEV_INTEGRATION_FIXTURES=1` 时才临时开放测试控件。
 
 ## ❤️赞助商
 
@@ -64,7 +73,7 @@
 
 <table align="center">
 <tr>
-<td align="center"><img src="docs/images/overlay.png" width="300" alt="悬浮窗：聊天上方的 Jev 分析面板" /><br/><sub>悬浮窗：危险等级、对方真实意图、排好序的 3 条候选回复</sub></td>
+<td align="center"><img src="docs/images/overlay.png" width="300" alt="悬浮窗：聊天上方的 Jev 分析面板" /><br/><sub>悬浮窗：危险等级、对方真实意图、排好序的 4 条策略候选回复</sub></td>
 <td align="center"><img src="docs/images/settings.png" width="300" alt="设置页" /><br/><sub>设置页：判断 / 回复 / 视觉三路接口分别可配</sub></td>
 </tr>
 </table>
@@ -77,7 +86,7 @@
 - **一套内核，多平台。** QQ、X 真机跑通，飞书靠 OCR 补正文。新增一个 App 只需写一个几十行的适配器。
 - **它认识你的人和事。** 本地知识库与联系人档案，分析时自动带上命中的笔记和这个人的历史，回复不会和你的设定打架。
 - **接口自己配。** 判断 / 回复 / 视觉三路分别可填，用你自己的密钥和额度，不经过任何中间服务器。
-- **隐私在本机。** 密钥存 App 私有空间，聊天内容只在分析那一刻发给你配置的接口，不落盘、不进日志。
+- **隐私边界清楚。** 密钥存在 App 私有空间；聊天正文只在触发分析时发送给你自己配置的模型接口。聊天历史默认关闭，只有你主动开启后才会落在本机私有目录；日志不记录聊天正文。
 
 ## 平台支持
 
@@ -127,9 +136,9 @@ Android 11+，当前构建面向 ARM64 / `arm64-v8a`。Debug 与 Release 签名�
 在设置 → 分析 →「知识库与联系人」。
 
 - **笔记**：标题 / 内容 / 标签 / 常驻。常驻笔记每次都带；其它笔记要标签或标题出现在会话标题或最近 6 条消息里才带，最多 5 条。支持多行文本粘贴导入，空行分段，每段首行当标题。
-- **联系人**：姓名 / 别名（每行一个）/ 关系 / 备注。会话标题匹配姓名或任一别名时生效，自动忽略群名尾部人数、首尾空白和大小写差异。悬浮窗气泡长按可把当前会话一键存为联系人。
+- **联系人**：姓名 / 别名 / 平台身份 / 关系 / 画像 / 边界 / 备注。实时聊天优先按 **App + 会话标题** 精确匹配；旧联系人只有在其 `apps[]` 已明确包含当前 App 时才允许同 App 的姓名 / alias 兼容匹配，**不会跨 App 仅凭同名自动绑定**。悬浮球长按可保存当前会话或显式关联到已有联系人。
 - **历史**：「记录聊天历史（只存本机）」默认关闭；开启后每次分析带上最近 N 条（默认 30），并自动去掉屏幕上已经显示过的部分。
-- **清除与备份**：知识库与历史都存在 App 私有目录，设置里可一键清空；还可从「本地加密备份与删除」创建多份 AES-GCM 加密备份、逐份恢复/删除或一键删除全部。清空知识库不会自动删除备份；备份只可在当前设备和当前安装内恢复，不包含 API 密钥或接口配置。
+- **清除、合并与备份**：删除 / 合并联系人会先保存整份知识库快照；关键写入或删除失败时会恢复原状态并向用户报告失败。单联系人历史清除和全库清空也会检查真实删除结果。本地加密备份使用 Android Keystore + AES-GCM，可逐份恢复/删除；清空知识库不会自动删除备份，备份不包含 API Key 或接口配置。
 - 悬浮窗面板顶部会显示一行「知识库 N 条 · 历史 M 条」，方便确认到底带了什么。
 
 ### 接口与模型
@@ -139,7 +148,7 @@ Android 11+，当前构建面向 ARM64 / `arm64-v8a`。Debug 与 Release 签名�
 - 判断接口另有「Vercel」预设：地址 `https://ai-gateway.vercel.sh/typesafe`，模型 `typesafe-ai/jev`，密钥用 [Vercel AI Gateway](https://vercel.com/ai-gateway/models/jev) 的 key。协议与 TypeSafe 直连相同（`POST /v1/systemone`）。
 - 判断接口另有「OpenCode Zen」预设：地址 `https://opencode.ai/zen`，模型 `jev-1.13`（输出免费、输入 $0.042/M，一次判断约 1000 输入 token），密钥用 [OpenCode Zen](https://opencode.ai/zen) 的 key。协议与 TypeSafe 直连相同（`POST /v1/systemone`）；想全免费可手动改成 `jev-1.13-free`（限时，功能受限）。
 - 内置 OpenRouter、TypeSafe 直连、Vercel、OpenCode Zen、DeepSeek 官方、通义兼容预设，每张卡一键连通测试。
-- 只有一把密钥也能用，但**只会在同一服务商/同一规范化主机内继承**。如果判断、回复、视觉切到不同服务商，必须为对应路由单独填写 Key，避免把 A 服务商凭据发给 B 服务商。
+- 只有一把密钥也能用，但**只会在同一 API origin（scheme + hostname + 有效端口）内继承**。如果判断、回复、视觉切到不同 origin，必须为对应路由单独填写 Key，避免把 A 服务商凭据发给 B 服务商。OpenRouter / DeepSeek 的专属请求逻辑也只对各自精确 hostname 生效，仿冒或镜像域名不会被误判为官方服务。
 - 从旧版本升级时，原来那把密钥会一次性迁移到新的三卡结构。
 
 ### 采集与 OCR
@@ -168,7 +177,7 @@ Android 11+，当前构建面向 ARM64 / `arm64-v8a`。Debug 与 Release 签名�
 <details>
 <summary><b>我的聊天记录会被上传吗？</b></summary>
 
-聊天内容只在你触发分析的那一刻，发给你自己在设置里配置的模型接口。项目没有任何自建服务器，不收集、不落盘、不进日志。历史记录默认关闭，开启后也只存在手机的 App 私有目录里。
+聊天正文只在你触发分析时发给你自己配置的模型接口，**不经过作者服务器**。历史记录默认关闭；你主动开启后，才会把关联历史写入手机的 App 私有目录。logcat 不记录聊天正文，API 用量统计只保存时间、路由、模型、token / 费用等元数据。
 
 </details>
 
@@ -207,18 +216,18 @@ QQ / X / 飞书 ──(无障碍读节点)──▶ 采集最近消息
                                   │
               ┌───────────────────┴───────────────────┐
               ▼                                        ▼
-   Jev 判断（一次 7 道题）                    生成模型起草 3 条候选
+   Jev 判断（一次 7 道题）                    生成模型起草 4 条策略候选
    意图 / 危险 / 需求 / 动作 / 该不该回          │
               └───────────────────┬───────────────────┘
                                   ▼
-                        Jev 给 3 条候选排序
+                        Jev 给 4 条候选排序
                                   ▼
                 半透明悬浮窗展示 → 复制 / 填入（不发送）
 ```
 
 - **采集**：一个 App 一个适配器，服务按前台包名分发。适配器只负责把当前窗口变成「标题 + 消息列表（谁说的、说了什么）」，下游全部通用；树里没有正文时走截屏 + 离线 OCR 兜底（限频、失败退避，不会每秒连拍）。
 - **判断**：[Jev](https://docs.typesafe.ai/) 只回答选择 / 打分 / 是非，一次请求发全部题目，约 1 秒返回；命中知识库时 state 里会带 `background`（关系 + 联系人备注 + 命中笔记）和 `history`（历史消息）。
-- **回复**：生成模型起草 3 条候选，Jev 排序；提示词要求回复必须与知识库一致，不编造知识库没有的事实。
+- **回复**：生成模型起草 4 条策略候选，Jev 排序；提示词要求回复必须与知识库一致，不编造知识库没有的事实。
 - **回填**：`ACTION_SET_TEXT`，失败则剪贴板 + `ACTION_PASTE`，不发送。
 
 <details>
@@ -233,7 +242,7 @@ QQ / X / 飞书 ──(无障碍读节点)──▶ 采集最近消息
 | App | 树的情况 | 适配器怎么做 |
 |---|---|---|
 | QQ | 节点开放，有 id | 正文 `id/mjn`、标题 `id/371`，按气泡贴哪侧头像判谁说的 |
-| 微信 | 已隐藏消息文字，部分设备还开启了防截屏 | 已停用：1.4 起不再接入采集分发，适配器代码保留在仓库中，以便日后微信策略变化时恢复 |
+| 微信 | 普通无障碍消息节点不可靠，部分设备还会拒绝截屏 | 不走普通消息 Adapter；采用独立实验路径：当前标题白名单 → 通知/无障碍触发 → Accessibility screenshot → 本地 ML Kit OCR。受保护窗口直接降级，不绕过 |
 | X | Compose，无 id，text 为空 | 解析 content-desc `发件人：正文。时间。Read`，发件人是「你」即我方 |
 | 飞书 | 正文自绘，树里没有文字 | 树上拿 bubble_content_container 矩形与已读状态，OCR 每个矩形的正文 |
 
@@ -282,10 +291,10 @@ JEV_INTEGRATION_FIXTURES=1 ./gradlew :app:assembleDebug :integration-fixture:ass
 - **国产 ROM 后台冻结**：小米 / HyperOS 会杀后台进程，前台保活、自启动、省电无限制都配了仍可能被杀，气泡短暂消失，在聊天里再交互一下自愈。
 - **飞书正文靠 OCR**：飞书正文是自绘控件，无障碍树里只有气泡矩形，1.3 起对每个矩形做离线 OCR；我 / 对方按已读状态判断，判反时请用「存为联系人」并在备注里说明，或关掉自动分析改手动。
 - **X 只按中文界面验过**：分隔符 `：`、`上午 / 下午`、`Read` 是中文界面实测；英文界面只做了兜底，未验。
-- **群聊**：按一对一分析，「对方」与关系设定对群聊不准。
+- **群聊人物识别依赖适配器可见信息**：QQ / X 能拿到可靠 speaker 时会使用“群 Contact + 当前发言人 Person”；拿不到可靠昵称（尤其微信 OCR）时只使用群整体上下文，不会猜人物。
 - **中文**：Jev 主训练语言是英文，题目用英文、聊天内容保留中文；建议用自己的真实对话做一批标注校准（见 `tools/jev/`）。
 - **微信仍属实验支持**：普通无障碍节点读取不可靠，因此当前路径是“通知触发 → 当前会话标题匹配 → Accessibility screenshot → 本地 ML Kit OCR”。如果微信/ROM 使用受保护窗口或拒绝截图，会自动降级；项目不会尝试绕过系统或应用的防截屏策略。
-- **知识库检索是标签/标题包含匹配**，不做语义检索，笔记请打好标签才能被命中。历史按「谁说 + 原文」去重，同一个人重复说同一句只记一次。
+- **知识库检索是标签/标题包含匹配**，不做向量语义检索。最终发送给模型的 background 还有约 2400 字符硬上限，超出会截断。历史按屏幕序列重叠去重，重复短句在不同位置仍可能作为不同消息保留。
 - **OCR 依赖系统放行截屏**：无障碍服务要被系统允许截屏才能用，小米 / HyperOS 可能拒绝（面板会提示失败原因）；受保护窗口（`FLAG_SECURE`）截不到。
 - **OCR 只认屏幕上看得见的部分**：长消息被截断的部分读不到；识别有错字。
 - **包体变大**：ML Kit 中文离线模型让 APK 从约 12 MB 增至约 27 MB，且只打 arm64-v8a。
@@ -332,7 +341,7 @@ JEV_INTEGRATION_FIXTURES=1 ./gradlew :app:assembleDebug :integration-fixture:ass
 Copyright © 2026 Finderchangchang 与 jev-chat 贡献者。代码以 [MIT](LICENSE) 协议开源，另见 [NOTICE](NOTICE)。
 
 - **可以商用**：个人和公司都可以使用、修改、再分发，或集成进自己的产品，不需要付费或事先授权。
-- **必须注明出处**：分发或商用时保留 LICENSE 与 NOTICE，并在产品「关于」页、说明文档或发布页写明来源。推荐写法：`基于 Jev 聊天助手（https://github.com/jev-chat/jev-chat-jarvis）二次开发`。
+- **必须注明出处**：分发或商用时保留 LICENSE 与 NOTICE，并在产品「关于」页、说明文档或发布页写明来源。推荐写法：`基于 Jev 聊天助手（上游：https://github.com/jev-chat/jev-chat-jarvis）二次开发；当前 Ultimate Fork：https://github.com/kitzhn/jev-chat-jarvis`。
 - 不要用「Jev 聊天助手」「jev-chat」名称或 chatjevs.com 域名暗示由原作者出品或背书。
 
 **免责声明**：本项目只处理你自己设备上、你自己有权查看的聊天。请遵守微信、QQ、X、飞书等各软件的许可协议与当地法律法规，作者不对使用后果负责。
