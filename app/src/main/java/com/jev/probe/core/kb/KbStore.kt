@@ -476,38 +476,8 @@ class KbStore private constructor(context: Context) {
      * @param app package name of the chat app the title came from; used only to
      *        prefer a contact that already knows this app when two match.
      */
-    fun findContact(title: String, app: String): Contact? {
-        synchronized(lock) {
-            val want = normalizeName(title)
-            if (want.isEmpty()) return null
-            val contacts = loadContacts()
-
-            // Exact app-scoped identities are authoritative.
-            if (app.isNotBlank()) {
-                contacts.firstOrNull { c ->
-                    c.identities.any { identity ->
-                        identity.app == app &&
-                            identity.scope.isBlank() &&
-                            normalizeName(identity.title) == want
-                    }
-                }?.let { return it }
-            }
-
-            val nameHits = contacts.filter { c ->
-                normalizeName(c.name) == want || c.aliases.any { normalizeName(it) == want }
-            }
-            if (nameHits.isEmpty()) return null
-
-            // Legacy contacts may have only apps[] and no PlatformIdentity yet.
-            // Keep that same-app migration path, but never use a global name/alias
-            // match to jump across apps: two unrelated people can share a name.
-            if (app.isNotBlank()) {
-                return nameHits.firstOrNull { app in it.apps }
-            }
-
-            // App-less lookups are admin/UI lookups, not live conversation binding.
-            return nameHits.firstOrNull()
-        }
+    fun findContact(title: String, app: String): Contact? = synchronized(lock) {
+        findContactForApp(loadContacts(), title, app)
     }
 
     /**
@@ -1267,6 +1237,34 @@ class KbStore private constructor(context: Context) {
             }
 
         fun newId(): String = java.util.UUID.randomUUID().toString().substring(0, 12)
+
+        /**
+         * Live conversation identity resolution. Exact app-scoped identities win;
+         * legacy name/alias matching is allowed only when that contact already
+         * declares the same app. App-less calls are admin/UI lookups.
+         */
+        internal fun findContactForApp(
+            contacts: List<Contact>,
+            title: String,
+            app: String
+        ): Contact? {
+            val want = normalizeName(title)
+            if (want.isEmpty()) return null
+            if (app.isNotBlank()) {
+                contacts.firstOrNull { c ->
+                    c.identities.any { identity ->
+                        identity.app == app &&
+                            identity.scope.isBlank() &&
+                            normalizeName(identity.title) == want
+                    }
+                }?.let { return it }
+            }
+            val nameHits = contacts.filter { c ->
+                normalizeName(c.name) == want || c.aliases.any { normalizeName(it) == want }
+            }
+            if (app.isNotBlank()) return nameHits.firstOrNull { app in it.apps }
+            return nameHits.firstOrNull()
+        }
 
         /**
          * Compile a pattern without ever taking the class down with it. A
