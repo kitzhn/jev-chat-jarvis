@@ -183,22 +183,7 @@ class Prefs(context: Context, prefsName: String = PREFS_MAIN) {
         get() = sp.getInt(K_CTX_COUNT, 30)
         set(v) = sp.edit().putInt(K_CTX_COUNT, v).apply()
 
-    /** Auto-summarize a contact once enough history accumulates. */
-    var autoSummary: Boolean
-        get() = sp.getBoolean(K_AUTO_SUMMARY, true)
-        set(v) = sp.edit().putBoolean(K_AUTO_SUMMARY, v).apply()
-
     // ------------------------------------------------------------ OCR (B)
-
-    /** "mlkit" | "vision". */
-    var ocrEngine: String
-        get() = sp.getString(K_OCR_ENGINE, OCR_MLKIT) ?: OCR_MLKIT
-        set(v) = sp.edit().putString(K_OCR_ENGINE, v.trim()).apply()
-
-    /** Run generic OCR capture on apps with no dedicated adapter. */
-    var ocrForUnknownApps: Boolean
-        get() = sp.getBoolean(K_OCR_UNKNOWN, true)
-        set(v) = sp.edit().putBoolean(K_OCR_UNKNOWN, v).apply()
 
     /** Fall back to OCR when an adapted app's node tree comes back empty. */
     var ocrFallback: Boolean
@@ -361,9 +346,6 @@ class Prefs(context: Context, prefsName: String = PREFS_MAIN) {
         private const val K_DEEPSEEK_THINKING = "deepseek_thinking_enabled"
         private const val K_CTX_ENABLED = "context_enabled"
         private const val K_CTX_COUNT = "context_history_count"
-        private const val K_AUTO_SUMMARY = "auto_summary"
-        private const val K_OCR_ENGINE = "ocr_engine"
-        private const val K_OCR_UNKNOWN = "ocr_unknown_apps"
         private const val K_OCR_FALLBACK = "ocr_fallback"
         private const val K_OCR_AUTO = "ocr_auto_analyze"
         private const val K_WECHAT_AUTO_OCR = "wechat_auto_ocr"
@@ -385,8 +367,6 @@ class Prefs(context: Context, prefsName: String = PREFS_MAIN) {
         const val PROVIDER_ZEN = "zen"
         const val PROVIDER_CUSTOM = "custom"
 
-        const val OCR_MLKIT = "mlkit"
-        const val OCR_VISION = "vision"
 
         // Judge route presets.
         // Bocha Jev: same protocol/path as TypeSafe (/v1/systemone). Limited-time free.
