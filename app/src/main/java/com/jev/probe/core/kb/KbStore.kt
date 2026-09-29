@@ -490,7 +490,7 @@ class KbStore private constructor(context: Context) {
         val existing = findContact(title, app)
         if (existing == null) {
             val aliases = if (displayName(title) != title.trim()) listOf(title.trim()) else emptyList()
-            saveContact(Contact(
+            val saved = saveContact(Contact(
                 id = newId(),
                 name = display,
                 aliases = aliases,
@@ -499,7 +499,7 @@ class KbStore private constructor(context: Context) {
                     PlatformIdentity(app = app, title = display, label = "")
                 )
             ))
-            return "已存为联系人「${display}」"
+            return if (saved) "已存为联系人「${display}」" else "保存联系人失败；请检查存储空间后重试"
         }
         val alreadyLinked = existing.identities.any {
             it.app == app &&
@@ -507,8 +507,11 @@ class KbStore private constructor(context: Context) {
                 normalizeName(it.title) == normalizeName(display)
         }
         if (alreadyLinked) return "联系人「${existing.name}」已关联当前会话"
-        linkIdentity(existing.id, app, display)
-        return "已把当前会话并入联系人「${existing.name}」"
+        return if (linkIdentity(existing.id, app, display)) {
+            "已把当前会话并入联系人「${existing.name}」"
+        } else {
+            "关联联系人失败；请检查存储空间后重试"
+        }
     }
 
     // ---------------------------------------------------------------- history
@@ -621,12 +624,9 @@ class KbStore private constructor(context: Context) {
     fun clearLog(contactId: String): Boolean = synchronized(lock) {
         logCache.remove(contactId)
         lastScreenCache.remove(contactId)
-        val ok = deleteAtomicFile(logFile(contactId)) && deleteAtomicFile(screenFile(contactId))
-        if (!ok) {
-            logCache.remove(contactId)
-            lastScreenCache.remove(contactId)
-        }
-        ok
+        val logDeleted = deleteAtomicFile(logFile(contactId))
+        val screenDeleted = deleteAtomicFile(screenFile(contactId))
+        logDeleted && screenDeleted
     }
 
     /**
