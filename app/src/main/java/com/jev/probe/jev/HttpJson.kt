@@ -137,9 +137,13 @@ object HttpJson {
         } catch (_: Exception) { "" }
     }
 
-    /** OpenRouter wants attribution headers; other hosts reject unknown ones politely. */
+    /** Exact hostname comparison for provider-specific behavior. */
+    fun isHost(url: String, expectedHost: String): Boolean =
+        runCatching { URL(url).host.equals(expectedHost, ignoreCase = true) }.getOrDefault(false)
+
+    /** OpenRouter wants attribution headers; do not match look-alike hostnames. */
     fun headersFor(url: String): Map<String, String> =
-        if (url.contains("openrouter.ai", ignoreCase = true))
+        if (isHost(url, "openrouter.ai"))
             mapOf("HTTP-Referer" to "https://jev-assistant.local", "X-Title" to "Jev Assistant")
         else emptyMap()
 
