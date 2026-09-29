@@ -18,9 +18,9 @@
 <meta name="twitter:image" content="https://chatjevs.com/assets/og.png">
 <script>
   window.JEV = {
-    version: "1.4",
-    apkUrl: "https://github.com/jev-chat/jev-chat-jarvis/raw/main/apk/jev-assistant-v1.4-release.apk",
-    repo: "https://github.com/jev-chat/jev-chat-jarvis"
+    version: "2.5.2",
+    apkUrl: "https://github.com/kitzhn/jev-chat-jarvis/releases/latest/download/jev-ultimate-arm64.apk",
+    repo: "https://github.com/kitzhn/jev-chat-jarvis"
   };
   // 提前应用主题，避免首屏闪白
   (function () {
@@ -79,7 +79,7 @@
 
     <p class="lead reveal"><strong>Jev 聊天助手在你的设备上读取你正在看的聊天，把内容发给你自己配置的模型接口做判断和起草回复。作者不运营服务器，收不到你的任何数据。</strong></p>
 
-    <p class="meta reveal">版本 v1.1，生效日期 2026-09-27。适用范围：Android 端 <a href="https://github.com/jev-chat/jev-chat-jarvis" target="_blank" rel="noopener">jev-chat-jarvis</a>。Windows 版（<a href="https://github.com/jev-chat/jev-chat-windows" target="_blank" rel="noopener">jev-chat-windows</a>）与 macOS 版（<a href="https://github.com/jev-chat/jev-chat-jarvis-mac" target="_blank" rel="noopener">jev-chat-jarvis-mac</a>）是各自独立的仓库和安装包，不在本政策范围内，请分别查看它们自己的说明。</p>
+    <p class="meta reveal">版本 v1.2，生效日期 2026-09-29。适用范围：Android 端 <a href="https://github.com/kitzhn/jev-chat-jarvis" target="_blank" rel="noopener">jev-chat-jarvis</a>。Windows 版（<a href="https://github.com/jev-chat/jev-chat-windows" target="_blank" rel="noopener">jev-chat-windows</a>）与 macOS 版（<a href="https://github.com/kitzhn/jev-chat-jarvis-mac" target="_blank" rel="noopener">jev-chat-jarvis-mac</a>）是各自独立的仓库和安装包，不在本政策范围内，请分别查看它们自己的说明。</p>
 
     <p class="reveal">如果你更习惯先看结论：本项目<strong>不是</strong>"零数据收集"产品——它确实会把你正在看的聊天文字发给一个第三方模型接口，但那个接口地址是你自己在设置里填的，不是作者的服务器。其它数据只留在你手机里；知识库和加密备份有各自的删除入口，卸载或清除应用数据会删除全部本地数据。下面逐项说清楚"发了什么、发给谁、什么时候发、存在哪、怎么删"。</p>
 
@@ -255,7 +255,7 @@
       <li>只处理你自己设备上、你自己有权查看的聊天，不处理其它人的设备。</li>
       <li>无广告、无第三方分析或统计 SDK（不含 Google Analytics、Firebase、友盟等）、不使用 Cookie 或广告标识符。</li>
       <li>作者不运营任何服务器，不接收、不留存、不出售、不用于训练任何模型你的聊天内容——因为这些内容压根不经过作者。</li>
-      <li>开源：以上每一条说法，都可以在 GitHub 仓库里对照源码核实：<a href="https://github.com/jev-chat/jev-chat-jarvis" target="_blank" rel="noopener">github.com/jev-chat/jev-chat-jarvis</a></li>
+      <li>开源：以上每一条说法，都可以在 GitHub 仓库里对照源码核实：<a href="https://github.com/kitzhn/jev-chat-jarvis" target="_blank" rel="noopener">github.com/jev-chat/jev-chat-jarvis</a></li>
     </ul>
 
     <h2 class="reveal" id="control">6. 你的控制权</h2>
@@ -280,7 +280,7 @@
 
     <h2 class="reveal" id="contact">10. 联系</h2>
     <ul class="reveal">
-      <li>GitHub Issues：<a href="https://github.com/jev-chat/jev-chat-jarvis/issues" target="_blank" rel="noopener">github.com/jev-chat/jev-chat-jarvis/issues</a></li>
+      <li>GitHub Issues：<a href="https://github.com/kitzhn/jev-chat-jarvis/issues" target="_blank" rel="noopener">github.com/jev-chat/jev-chat-jarvis/issues</a></li>
       <li>公众号私信（二维码见仓库 README）</li>
     </ul>
 
@@ -296,10 +296,10 @@
         <li><strong>Local-only storage</strong>: API keys, endpoint settings, knowledge-base notes/contacts, and (if enabled) per-contact chat history live only in the app's private storage on your device. Optional knowledge-base backups are encrypted with an Android Keystore AES-GCM key and remain usable only in this app installation on this device. The settings page can delete one backup or all backups; deleting all backups actively removes the key, while clearing the active knowledge base does not delete backup copies. Uninstalling or clearing app data removes the local files.</li>
         <li><strong>No ads, no third-party analytics SDKs</strong> (no Google Analytics, Firebase, etc.), no cookies or advertising identifiers.</li>
         <li>The app never sends messages automatically — you always press send yourself — and it never touches money transfers, red packets, or payments.</li>
-        <li>The project is open source; every claim above can be verified against the source at <a href="https://github.com/jev-chat/jev-chat-jarvis" target="_blank" rel="noopener">github.com/jev-chat/jev-chat-jarvis</a>.</li>
+        <li>The project is open source; every claim above can be verified against the source at <a href="https://github.com/kitzhn/jev-chat-jarvis" target="_blank" rel="noopener">github.com/jev-chat/jev-chat-jarvis</a>.</li>
         <li>Third-party model providers you choose to use are governed by their own privacy policies, which you should review separately.</li>
       </ul>
-      <p>Version 1.1, effective 2026-09-27. Scope: Android app only.</p>
+      <p>Version 1.2, effective 2026-09-29. Scope: Android app only.</p>
     </div>
 
   </div>
@@ -321,7 +321,7 @@
       <h4>产品</h4>
       <a data-jev-apk href="#">下载 APK v<span data-jev-version>1.2</span></a>
       <a href="https://github.com/jev-chat/jev-chat-windows/releases" target="_blank" rel="noopener">Windows 版</a>
-      <a href="https://github.com/jev-chat/jev-chat-jarvis-mac/releases" target="_blank" rel="noopener">macOS 版</a>
+      <a href="https://github.com/kitzhn/jev-chat-jarvis-mac/releases" target="_blank" rel="noopener">macOS 版</a>
       <a href="index.html#start">快速开始</a>
       <a href="index.html#platforms">平台支持</a>
     </nav>
@@ -342,7 +342,7 @@
   </div>
 
   <div class="wrap foot-bottom">
-    <p>© 2026 Jev 聊天助手 · <a href="https://github.com/jev-chat/jev-chat-jarvis/blob/main/LICENSE" target="_blank" rel="noopener">MIT 开源</a> · 可商用，须注明出处（<a href="https://github.com/jev-chat/jev-chat-jarvis/blob/main/NOTICE" target="_blank" rel="noopener">NOTICE</a>） · <a href="privacy.html">隐私政策</a></p>
+    <p>© 2026 Jev 聊天助手 · <a href="https://github.com/kitzhn/jev-chat-jarvis/blob/main/LICENSE" target="_blank" rel="noopener">MIT 开源</a> · 可商用，须注明出处（<a href="https://github.com/kitzhn/jev-chat-jarvis/blob/main/NOTICE" target="_blank" rel="noopener">NOTICE</a>） · <a href="privacy.html">隐私政策</a></p>
     <p class="disclaimer">仅供个人学习与研究使用，只处理你自己设备上、你自己有权查看的聊天，请遵守各软件许可协议与当地法律法规。</p>
   </div>
 </footer>
