@@ -765,3 +765,8 @@ Contact
 老版本中保存的默认 `deepseek-chat` 或 `deepseek/deepseek-chat-v3.1` 会在升级后自动迁移；用户手动填写的自定义模型不会被覆盖。
 
 DeepSeek V4.1 Flash 也支持图片输入，因此视觉接口现在可以直接选择 **DeepSeek 官方**。
+
+
+## 28. 来源与二次开发说明
+
+`基于 Jev 聊天助手（上游：https://github.com/jev-chat/jev-chat-jarvis）二次开发；当前 Ultimate Fork：https://github.com/kitzhn/jev-chat-jarvis`。
