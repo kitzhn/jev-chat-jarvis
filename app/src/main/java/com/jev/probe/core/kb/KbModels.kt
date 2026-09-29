@@ -210,6 +210,13 @@ data class ChatContext(
         notes.forEach { n ->
             sb.append(n.title.trim()).append(": ").append(n.content.trim()).append('\n')
         }
-        return sb.toString().trim()
+        val text = sb.toString().trim()
+        return if (text.length <= MAX_BACKGROUND_CHARS) text
+        else text.take(MAX_BACKGROUND_CHARS).trimEnd() + "\n[背景已按长度上限截断]"
+    }
+
+    companion object {
+        /** Hard ceiling for model background; prevents unbounded always-on notes/profile text. */
+        const val MAX_BACKGROUND_CHARS = 2400
     }
 }
