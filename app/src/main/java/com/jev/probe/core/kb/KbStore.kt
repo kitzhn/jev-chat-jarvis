@@ -315,130 +315,157 @@ class KbStore private constructor(context: Context) {
         null
     }
 
+    /**
+     * Merge two contacts as one knowledge-base transaction. The whole committed
+     * knowledge base is snapshotted first; any failed file write/delete restores
+     * that snapshot, so callers never observe a "merge failed" result after only
+     * part of the contact/history/graph state has changed.
+     */
     private fun mergeContacts(targetId: String, sourceId: String): Boolean {
         if (targetId == sourceId) return true
-        val list = loadContacts()
-        val target = list.firstOrNull { it.id == targetId } ?: return false
-        val source = list.firstOrNull { it.id == sourceId } ?: return false
-
-        fun joined(a: String, b: String): String = when {
-            a.isBlank() -> b
-            b.isBlank() || a.contains(b) -> a
-            else -> a.trim() + "\n" + b.trim()
-        }
-
-        val merged = target.copy(
-            aliases = (target.aliases + source.name + source.aliases)
-                .map { it.trim() }.filter { it.isNotEmpty() }.distinct(),
-            apps = (target.apps + source.apps).distinct(),
-            identities = (target.identities + source.identities).distinctBy {
-                it.app + "\u0000" + normalizeName(it.scope) + "\u0000" + normalizeName(it.title)
-            },
-            relationship = target.relationship.ifBlank { source.relationship },
-            relationshipStage = target.relationshipStage.ifBlank { source.relationshipStage },
-            profileTags = (target.profileTags + source.profileTags).distinct(),
-            traits = joined(target.traits, source.traits),
-            communicationStyle = joined(target.communicationStyle, source.communicationStyle),
-            boundaries = joined(target.boundaries, source.boundaries),
-            notes = joined(target.notes, source.notes),
-            strategySelections = (target.strategySelections.keys + source.strategySelections.keys)
-                .associateWith { key ->
-                    (target.strategySelections[key] ?: 0) + (source.strategySelections[key] ?: 0)
-                }.filterValues { it > 0 },
-            autoSummary = joined(target.autoSummary, source.autoSummary)
-        )
-        if (!saveContact(merged)) return false
-
-        val mergedLog = (loadLog(targetId) + loadLog(sourceId))
-            .sortedBy { it.ts }
-            .distinctBy { "${it.ts}\u0000${it.side}\u0000${it.speaker ?: ""}\u0000${it.app}\u0000${it.text}" }
-            .takeLast(MAX_LOG)
-            .toMutableList()
-        if (!writeAtomic(logFile(targetId), logJson(mergedLog))) return false
-        logCache[targetId] = mergedLog
-
-        val mergedEvents = (loadRelationshipEvents(targetId) + loadRelationshipEvents(sourceId))
-            .sortedBy { it.ts }
-            .distinctBy { it.id }
-            .takeLast(MAX_RELATION_EVENTS)
-            .toMutableList()
-        if (!writeAtomic(relationFile(targetId), relationshipEventsJson(mergedEvents))) return false
-        relationCache[targetId] = mergedEvents
-
-        val rewired = loadContactRelations()
-            .map { edge ->
-                edge.copy(
-                    fromId = if (edge.fromId == sourceId) targetId else edge.fromId,
-                    toId = if (edge.toId == sourceId) targetId else edge.toId
-                )
-            }
-            .filter { it.fromId != it.toId }
-            .distinctBy { edge ->
-                val pair = listOf(edge.fromId, edge.toId).sorted().joinToString("|")
-                pair + "\u0000" + edge.type.trim().lowercase()
-            }
-            .toMutableList()
-        if (!writeAtomic(graphFile, contactRelationsJson(rewired))) {
-            graphCache = null
+        val snapshot = try {
+            exportBackupFiles()
+        } catch (e: Exception) {
+            Log.e(TAG, "merge snapshot failed: ${e.javaClass.simpleName}")
             return false
         }
-        graphCache = rewired
 
-        list.removeAll { it.id == sourceId }
-        if (!writeAtomic(contactsFile, contactsJson(list))) {
-            contactsCache = null
-            return false
-        }
-        logCache.remove(sourceId)
-        relationCache.remove(sourceId)
-        lastScreenCache.remove(sourceId)
-        listOf(logFile(sourceId), screenFile(sourceId), relationFile(sourceId)).forEach {
-            if (!deleteAtomicFile(it)) Log.w(TAG, "failed to delete merged source file ${it.name}")
-        }
-        return true
-    }
+        val completed = try {
+            val list = loadContacts()
+            val target = list.firstOrNull { it.id == targetId } ?: return false
+            val source = list.firstOrNull { it.id == sourceId } ?: return false
 
-    /** Removes the contact only after both index files are safely updated. */
-    fun deleteContact(id: String): Boolean = synchronized(lock) {
-        val oldContacts = loadContacts().toList()
-        if (oldContacts.none { it.id == id }) return@synchronized false
-        val newContacts = oldContacts.filterNot { it.id == id }
+            fun joined(a: String, b: String): String = when {
+                a.isBlank() -> b
+                b.isBlank() || a.contains(b) -> a
+                else -> a.trim() + "\n" + b.trim()
+            }
 
-        val oldEdges = loadContactRelations().toList()
-        val newEdges = oldEdges.filterNot { it.fromId == id || it.toId == id }
+            val merged = target.copy(
+                aliases = (target.aliases + source.name + source.aliases)
+                    .map { it.trim() }.filter { it.isNotEmpty() }.distinct(),
+                apps = (target.apps + source.apps).distinct(),
+                identities = (target.identities + source.identities).distinctBy {
+                    it.app + "\u0000" + normalizeName(it.scope) + "\u0000" + normalizeName(it.title)
+                },
+                relationship = target.relationship.ifBlank { source.relationship },
+                relationshipStage = target.relationshipStage.ifBlank { source.relationshipStage },
+                profileTags = (target.profileTags + source.profileTags).distinct(),
+                traits = joined(target.traits, source.traits),
+                communicationStyle = joined(target.communicationStyle, source.communicationStyle),
+                boundaries = joined(target.boundaries, source.boundaries),
+                notes = joined(target.notes, source.notes),
+                strategySelections = (target.strategySelections.keys + source.strategySelections.keys)
+                    .associateWith { key ->
+                        (target.strategySelections[key] ?: 0) + (source.strategySelections[key] ?: 0)
+                    }.filterValues { it > 0 },
+                autoSummary = joined(target.autoSummary, source.autoSummary)
+            )
 
-        val completed = ContactDeleteCommit.execute(
-            writeContacts = { writeAtomic(contactsFile, contactsJson(newContacts)) },
-            writeRelations = { writeAtomic(graphFile, contactRelationsJson(newEdges)) },
-            restoreContacts = {
-                writeAtomic(contactsFile, contactsJson(oldContacts)).also { restored ->
-                    if (!restored) Log.e(TAG, "failed to roll back contacts after relation-write failure")
+            val mergedLog = (loadLog(targetId) + loadLog(sourceId))
+                .sortedBy { it.ts }
+                .distinctBy { "${it.ts}\u0000${it.side}\u0000${it.speaker ?: ""}\u0000${it.app}\u0000${it.text}" }
+                .takeLast(MAX_LOG)
+                .toMutableList()
+            val mergedEvents = (loadRelationshipEvents(targetId) + loadRelationshipEvents(sourceId))
+                .sortedBy { it.ts }
+                .distinctBy { it.id }
+                .takeLast(MAX_RELATION_EVENTS)
+                .toMutableList()
+            val rewired = loadContactRelations()
+                .map { edge ->
+                    edge.copy(
+                        fromId = if (edge.fromId == sourceId) targetId else edge.fromId,
+                        toId = if (edge.toId == sourceId) targetId else edge.toId
+                    )
                 }
-            },
-            deleteHistory = {
-                logCache.remove(id)
-                relationCache.remove(id)
-                lastScreenCache.remove(id)
-                var deleted = true
-                listOf(logFile(id), screenFile(id), relationFile(id)).forEach { file ->
-                    if (!deleteAtomicFile(file)) {
-                        deleted = false
-                        Log.w(TAG, "failed to delete ${file.name} after contact removal")
-                    }
+                .filter { it.fromId != it.toId }
+                .distinctBy { edge ->
+                    val pair = listOf(edge.fromId, edge.toId).sorted().joinToString("|")
+                    pair + "\u0000" + edge.type.trim().lowercase()
+                }
+                .toMutableList()
+            val newContacts = list.map { if (it.id == targetId) merged else it }
+                .filterNot { it.id == sourceId }
+                .toMutableList()
+
+            if (!writeAtomic(logFile(targetId), logJson(mergedLog))) false
+            else if (!writeAtomic(relationFile(targetId), relationshipEventsJson(mergedEvents))) false
+            else if (!writeAtomic(graphFile, contactRelationsJson(rewired))) false
+            else if (!writeAtomic(contactsFile, contactsJson(newContacts))) false
+            else {
+                val deleted = listOf(
+                    logFile(sourceId), screenFile(sourceId), relationFile(sourceId)
+                ).all { deleteAtomicFile(it) }
+                if (deleted) {
+                    contactsCache = newContacts
+                    graphCache = rewired
+                    logCache[targetId] = mergedLog
+                    relationCache[targetId] = mergedEvents
+                    logCache.remove(sourceId)
+                    relationCache.remove(sourceId)
+                    lastScreenCache.remove(sourceId)
                 }
                 deleted
             }
-        )
-        // Reload persisted state after any failed stage (including a failed
-        // rollback); never leave caches claiming a partial commit was complete.
+        } catch (e: Exception) {
+            Log.e(TAG, "merge failed: ${e.javaClass.simpleName}")
+            false
+        }
+
+        if (completed) return true
+        val rolledBack = runCatching {
+            restoreBackupFiles(snapshot)
+            true
+        }.getOrElse {
+            Log.e(TAG, "merge rollback failed: ${it.javaClass.simpleName}")
+            clearCaches()
+            false
+        }
+        if (!rolledBack) Log.e(TAG, "knowledge base may require restore from local backup")
+        return false
+    }
+
+    /**
+     * Delete a contact as one transaction. If any index update or per-contact
+     * file deletion fails, restore the exact pre-delete knowledge-base snapshot.
+     */
+    fun deleteContact(id: String): Boolean = synchronized(lock) {
+        val oldContacts = loadContacts().toList()
+        if (oldContacts.none { it.id == id }) return@synchronized false
+        val snapshot = try {
+            exportBackupFiles()
+        } catch (e: Exception) {
+            Log.e(TAG, "delete snapshot failed: ${e.javaClass.simpleName}")
+            return@synchronized false
+        }
+        val newContacts = oldContacts.filterNot { it.id == id }
+        val newEdges = loadContactRelations().filterNot { it.fromId == id || it.toId == id }
+
+        val completed = try {
+            writeAtomic(contactsFile, contactsJson(newContacts)) &&
+                writeAtomic(graphFile, contactRelationsJson(newEdges)) &&
+                listOf(logFile(id), screenFile(id), relationFile(id)).all { deleteAtomicFile(it) }
+        } catch (e: Exception) {
+            Log.e(TAG, "delete contact failed: ${e.javaClass.simpleName}")
+            false
+        }
+
         if (completed) {
             contactsCache = newContacts.toMutableList()
             graphCache = newEdges.toMutableList()
-        } else {
-            contactsCache = null
-            graphCache = null
+            logCache.remove(id)
+            relationCache.remove(id)
+            lastScreenCache.remove(id)
+            return@synchronized true
         }
-        completed
+
+        runCatching { restoreBackupFiles(snapshot) }
+            .onFailure {
+                Log.e(TAG, "delete rollback failed: ${it.javaClass.simpleName}")
+                clearCaches()
+            }
+        false
     }
 
     /**
@@ -453,8 +480,11 @@ class KbStore private constructor(context: Context) {
         synchronized(lock) {
             val want = normalizeName(title)
             if (want.isEmpty()) return null
+            val contacts = loadContacts()
+
+            // Exact app-scoped identities are authoritative.
             if (app.isNotBlank()) {
-                loadContacts().firstOrNull { c ->
+                contacts.firstOrNull { c ->
                     c.identities.any { identity ->
                         identity.app == app &&
                             identity.scope.isBlank() &&
@@ -462,11 +492,21 @@ class KbStore private constructor(context: Context) {
                     }
                 }?.let { return it }
             }
-            val hits = loadContacts().filter { c ->
+
+            val nameHits = contacts.filter { c ->
                 normalizeName(c.name) == want || c.aliases.any { normalizeName(it) == want }
             }
-            if (hits.isEmpty()) return null
-            return hits.firstOrNull { app.isNotBlank() && it.apps.contains(app) } ?: hits.first()
+            if (nameHits.isEmpty()) return null
+
+            // Legacy contacts may have only apps[] and no PlatformIdentity yet.
+            // Keep that same-app migration path, but never use a global name/alias
+            // match to jump across apps: two unrelated people can share a name.
+            if (app.isNotBlank()) {
+                return nameHits.firstOrNull { app in it.apps }
+            }
+
+            // App-less lookups are admin/UI lookups, not live conversation binding.
+            return nameHits.firstOrNull()
         }
     }
 
@@ -608,12 +648,15 @@ class KbStore private constructor(context: Context) {
         return ok
     }
 
-    fun clearLog(contactId: String) = synchronized(lock) {
+    fun clearLog(contactId: String): Boolean = synchronized(lock) {
         logCache.remove(contactId)
         lastScreenCache.remove(contactId)
-        runCatching { logFile(contactId).delete() }
-        runCatching { screenFile(contactId).delete() }
-        Unit
+        val ok = deleteAtomicFile(logFile(contactId)) && deleteAtomicFile(screenFile(contactId))
+        if (!ok) {
+            logCache.remove(contactId)
+            lastScreenCache.remove(contactId)
+        }
+        ok
     }
 
     /**
@@ -655,16 +698,12 @@ class KbStore private constructor(context: Context) {
      * Wipe every knowledge-base file. Deletes only `filesDir/kb` — API keys,
      * whitelist and every other SharedPreferences value are untouched.
      */
-    fun clearAll() = synchronized(lock) {
-        notesCache = null
-        contactsCache = null
-        graphCache = null
-        logCache.clear()
-        relationCache.clear()
-        lastScreenCache.clear()
-        runCatching { root.deleteRecursively() }
-        Log.i(TAG, "kb cleared")
-        Unit
+    fun clearAll(): Boolean = synchronized(lock) {
+        clearCaches()
+        val ok = deleteTreeChecked(root) && !root.exists()
+        if (ok) Log.i(TAG, "kb cleared")
+        else Log.w(TAG, "kb clear incomplete")
+        ok
     }
 
     /** Snapshot committed knowledge-base files under the store lock. */
