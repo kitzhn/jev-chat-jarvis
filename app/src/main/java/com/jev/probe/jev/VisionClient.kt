@@ -52,7 +52,7 @@ class VisionClient(private val prefs: Prefs) {
             .put("model", prefs.visionModel)
             .put("messages", messages)
             .put("temperature", 0.0)
-        if (url.contains("api.deepseek.com", ignoreCase = true) &&
+        if (HttpJson.isHost(url, "api.deepseek.com") &&
             prefs.visionModel == Prefs.DEEPSEEK_MODEL) {
             body.put("thinking", JSONObject().put(
                 "type",
@@ -60,7 +60,7 @@ class VisionClient(private val prefs: Prefs) {
             ))
             if (prefs.deepSeekThinkingEnabled) body.remove("temperature")
         }
-        if (url.contains("openrouter.ai", ignoreCase = true)) {
+        if (HttpJson.isHost(url, "openrouter.ai")) {
             body.put("usage", JSONObject().put("include", true))
         }
         val resp = HttpJson.post(url, prefs.effectiveVisionKey(), body, Route.VISION, HttpJson.headersFor(url))
