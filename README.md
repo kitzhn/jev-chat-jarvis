@@ -321,13 +321,22 @@ JEV_INTEGRATION_FIXTURES=1 ./gradlew :app:assembleDebug :integration-fixture:ass
   - `KnowledgeActivity` 知识库管理页（笔记 / 联系人）
 - `tools/jev/` — Jev 题目集与校准脚手架（Python）
 - `docs/` — 设计与验收文档
-- `apk/` — 上游历史 APK（Ultimate 请使用上面的 Actions 下载入口）
+- `apk/` — 上游历史 APK（Ultimate 请使用 GitHub Releases 的正式版下载入口）
 
 普通 Debug 构建中的 CI 控制组件默认 **不导出**；只有 Android 模拟器回归在设置 `JEV_INTEGRATION_FIXTURES=1` 时才临时导出测试入口。
 
+### 当前 CI 验证状态
+
+近期 2.5.2 加固合并后的 `main` 已完成以下自动回归：
+
+- **Build Android Debug APK #299**：单元测试 / Debug 编译 / CI 控件未导出检查 / APK artifact 全部通过。
+- **Android 15 Emulator Regression #177**：App + QQ / 微信 / 飞书 / X fixtures 编译、API 35 模拟器集成回归与 evidence 上传全部通过。
+
+CI fixture 只能验证公开接口和模拟交互，不能替代最新版 QQ / 微信在 ARM64 真机上的长期兼容性测试，也不会自动消耗真实付费模型额度。
+
 </details>
 
-### Ultimate 2.4：API 费用与 DeepSeek thinking
+### Ultimate 2.5.2：API 费用、DeepSeek thinking 与用量数据
 
 - API 用量明细仍最多保留 5000 条，但被淘汰的明细会合并到按日汇总，因此高频使用时不会因为明细上限而漏掉本月前半段的请求与费用。
 - 视觉接口如果服务商没有返回图片 prompt token，会明确显示“图片 token 未知”，不再用 Base64 字符串长度估算图片计费。
