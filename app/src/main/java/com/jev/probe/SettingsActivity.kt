@@ -825,7 +825,7 @@ class SettingsActivity : AppCompatActivity() {
         private const val SCRATCH_REPLY = "jev_probe_scratch_reply"
         private const val SCRATCH_VISION = "jev_probe_scratch_vision"
 
-        private const val PRIVACY_URL = "https://chatjevs.com/privacy.html"
+        private const val PRIVACY_URL = "https://github.com/kitzhn/jev-chat-jarvis/blob/main/PRIVACY.md"
         private const val REPO_URL = "https://github.com/kitzhn/jev-chat-jarvis"
         private const val GUIDE_URL =
             "https://github.com/kitzhn/jev-chat-jarvis/blob/main/docs/USER_GUIDE_ZH.md"
