@@ -36,15 +36,27 @@ class KeepAliveService : Service() {
         startForeground(1, notif)
     }
 
-    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int = START_STICKY
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        if (!com.jev.probe.core.Prefs(this).enabled) {
+            stopForeground(STOP_FOREGROUND_REMOVE)
+            stopSelf(startId)
+            return START_NOT_STICKY
+        }
+        return START_STICKY
+    }
 
     override fun onBind(intent: Intent?): IBinder? = null
 
     companion object {
         fun start(ctx: Context) {
+            if (!com.jev.probe.core.Prefs(ctx).enabled) return
             val i = Intent(ctx, KeepAliveService::class.java)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) ctx.startForegroundService(i)
             else ctx.startService(i)
+        }
+
+        fun stop(ctx: Context) {
+            runCatching { ctx.stopService(Intent(ctx, KeepAliveService::class.java)) }
         }
     }
 }
