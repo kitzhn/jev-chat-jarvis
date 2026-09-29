@@ -85,6 +85,7 @@ object ApiUsageStore {
     private const val ROLLUP_RETENTION_DAYS = 400L
     private const val STATE_VERSION = 2
     private const val USD_CNY = 6.71
+    @Volatile private var cachedState: UsageState? = null
 
     /** Metering must never turn an already successful, billable API call into an error. */
     fun recordSafely(
@@ -217,6 +218,7 @@ object ApiUsageStore {
 
     fun clear(context: Context) = synchronized(lock) {
         AtomicFile(usageFile(context)).delete()
+        cachedState = null
     }
 
     private fun summarizeRecords(records: List<ApiUsageRecord>): ApiUsageSummary =
@@ -394,6 +396,7 @@ object ApiUsageStore {
         File(File(context.filesDir, "usage").apply { mkdirs() }, "api_usage.json")
 
     private fun loadState(context: Context): UsageState {
+        cachedState?.let { return it }
         val file = usageFile(context)
         if (!file.exists() && !File(file.path + ".bak").exists())
             return UsageState(mutableListOf(), mutableListOf())
@@ -422,9 +425,11 @@ object ApiUsageStore {
             pruneRollups(state.rollups)
             if (state.rollups.size != rollupCount) needsMigration = true
             if (needsMigration) writeState(context, state)
+            cachedState = state
             state
         } catch (e: Exception) {
             // Never replace an unreadable ledger with an apparently empty one.
+            cachedState = null
             throw IllegalStateException("API 用量记录读取失败，原文件已保留", e)
         }
     }

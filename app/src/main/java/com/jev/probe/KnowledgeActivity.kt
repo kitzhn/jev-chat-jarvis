@@ -410,7 +410,9 @@ class KnowledgeActivity : AppCompatActivity() {
         tools.addView(miniAction("清空历史（$logN）", danger = true) {
             if (logN == 0) { toast("本来就没有历史") }
             else confirm("清空历史", "删掉「${c0.name}」的 $logN 条聊天历史？联系人画像保留。") {
-                store.clearLog(c0.id); render()
+                val cleared = store.clearLog(c0.id)
+                render()
+                toast(if (cleared) "聊天历史已清空" else "清空未完全成功；请检查存储空间后重试")
             }
         })
         c.addView(tools)
